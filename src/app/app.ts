@@ -7,8 +7,10 @@ import { SpeechService } from './speech.service';
 import { adminCsrf } from './session';
 import { QuestionAudioService } from './question-audio.service';
 import { UiIconComponent, IconName } from './ui-icon.component';
-@Component({ selector: 'app-root', changeDetection: ChangeDetectionStrategy.OnPush, imports: [ReactiveFormsModule, UiIconComponent], templateUrl: './app.html', styleUrl: './app.css' })
+import { SpeechLabComponent } from './experiments/speech-lab.component';
+@Component({ selector: 'app-root', changeDetection: ChangeDetectionStrategy.OnPush, imports: [ReactiveFormsModule, UiIconComponent, SpeechLabComponent], templateUrl: './app.html', styleUrl: './app.css' })
 export class App {
+  readonly speechLab = typeof location !== 'undefined' && new URLSearchParams(location.search).has('speech-lab');
   readonly interview = inject(InterviewService);
   readonly speech = inject(SpeechService);
   readonly audio = inject(QuestionAudioService);

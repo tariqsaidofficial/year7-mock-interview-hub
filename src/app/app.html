@@ -24,7 +24,8 @@
   </header>
 
   <main class="main-content">
-    @if (admin()) {
+    @if (speechLab) { <app-speech-lab /> }
+    @else if (admin()) {
       <section class="surface-card admin-card">
         <div class="section-heading"><div><p class="eyebrow">Protected teacher area</p><h1>Session records</h1><p class="muted">Review temporary answers and feedback for this session.</p></div><span class="heading-icon"><app-ui-icon name="shield" /></span></div>
         @if (!signedIn()) { <form (submit)="$event.preventDefault(); signIn()"><label class="field-label" for="admin-password">Administrator password</label><input id="admin-password" class="text-field" type="password" autocomplete="current-password" [formControl]="adminPassword" /><button type="submit" class="primary-button">Sign in <app-ui-icon name="arrow" /></button></form> }
