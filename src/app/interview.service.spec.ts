@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { InterviewService, STUDENT_CSRF } from './interview.service';
-import { SpeechService } from './speech.service';
+import { Nova3SpeechService } from './experiments/nova3-speech.service';
 import { QuestionAudioService } from './question-audio.service';
 import { saveDraft } from './draft';
 import { QUESTIONS } from './interview.models';
@@ -14,7 +14,7 @@ describe('supportive interview timing', () => {
   function service() {
     const speech = { stopRecognition: vi.fn() };
     const audio = { enterQuestion: vi.fn(), stop: vi.fn(), reset: vi.fn() };
-    TestBed.configureTestingModule({ providers: [InterviewService, { provide: SpeechService, useValue: speech }, { provide: QuestionAudioService, useValue: audio }, { provide: STUDENT_CSRF, useValue: vi.fn().mockResolvedValue('test-csrf') }] });
+    TestBed.configureTestingModule({ providers: [InterviewService, { provide: Nova3SpeechService, useValue: speech }, { provide: QuestionAudioService, useValue: audio }, { provide: STUDENT_CSRF, useValue: vi.fn().mockResolvedValue('test-csrf') }] });
     return { interview: TestBed.inject(InterviewService), speech, audio };
   }
 
@@ -54,6 +54,15 @@ describe('supportive interview timing', () => {
     interview.next();
     expect(interview.stage()).toBe('offline-pending');
     online.mockRestore(); interview.clear(); vi.useRealTimers();
+  });
+
+  it('stops the primary Nova-3 microphone when connectivity is interrupted', () => {
+    const { interview, speech } = service();
+    interview.showSetup(); interview.start('Example Student', '7A');
+    window.dispatchEvent(new Event('offline'));
+    expect(speech.stopRecognition).toHaveBeenCalled();
+    expect(interview.online()).toBe(false);
+    interview.clear();
   });
 
   it('restores a draft with its original countdown and answer', () => {

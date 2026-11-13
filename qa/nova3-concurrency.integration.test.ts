@@ -87,4 +87,23 @@ suite('Nova-3 token issuance under synthetic classroom concurrency', () => {
     expect(more.filter((item) => item.status === 'fulfilled' && item.value.kind === 'created')).toHaveLength(39);
     expect(more.filter((item) => item.status === 'fulfilled' && item.value.kind === 'limited')).toHaveLength(1);
   }, 90_000);
+
+  it('limits the isolated live-trial run to two temporary grants', async () => {
+    process.env['INTERVIEW_RUN_ID'] = `nova-trial-${nonce}`;
+    process.env['DEEPGRAM_LIVE_TRIAL'] = 'true';
+    try {
+      const { issueGuest } = await import('../server/session');
+      const { default: issueToken } = await import('../api/guest/nova3-token');
+      const guests = await Promise.all(Array.from({ length: 3 }, async () => {
+        const { state, res } = response(); const result = await issueGuest(request(), res);
+        expect(result.kind).toBe('created');
+        if (result.kind !== 'created') throw new Error('Guest creation failed');
+        return { cookie: state.cookie?.split(';')[0] || '', csrf: result.csrf };
+      }));
+      const statuses = await Promise.all(guests.map(async ({ cookie, csrf }) => {
+        const { state, res } = response(); await issueToken(request(cookie, csrf), res); return state.status;
+      }));
+      expect(statuses.sort()).toEqual([200, 200, 429]);
+    } finally { delete process.env['DEEPGRAM_LIVE_TRIAL']; }
+  }, 90_000);
 });

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, isDevMode, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { CATEGORIES, CategoryId, CompletedRecord, QUESTIONS } from './interview.models';
@@ -11,8 +11,8 @@ import { SpeechLabComponent } from './experiments/speech-lab.component';
 import { Nova3SpeechService } from './experiments/nova3-speech.service';
 @Component({ selector: 'app-root', changeDetection: ChangeDetectionStrategy.OnPush, imports: [ReactiveFormsModule, UiIconComponent, SpeechLabComponent], templateUrl: './app.html', styleUrl: './app.css' })
 export class App {
-  readonly speechLab = typeof location !== 'undefined' && new URLSearchParams(location.search).has('speech-lab');
-  readonly useNova3 = typeof location !== 'undefined' && new URLSearchParams(location.search).has('nova3');
+  readonly speechLab = isDevMode() && typeof location !== 'undefined' && new URLSearchParams(location.search).has('speech-lab');
+  readonly useNova3 = true;
   readonly interview = inject(InterviewService);
   readonly speech = this.useNova3 ? inject(Nova3SpeechService) : inject(SpeechService);
   readonly nova = inject(Nova3SpeechService);
@@ -42,11 +42,11 @@ export class App {
   constructor() {
     this.answer.valueChanges.subscribe((text) => { if (this.speech.isListening()) { this.speechGeneration++; if (this.useNova3) (this.speech as Nova3SpeechService).cancelRecognition(); else void this.speech.stopRecognition(); } this.interview.updateAnswer(text); });
     if (this.admin()) void this.checkSession();
-    window.addEventListener('popstate', () => { this.admin.set(location.pathname === '/admin'); if (this.admin()) void this.checkSession(); });
+    window.addEventListener('popstate', () => { if (this.speechLab) this.nova.cancelRecognition(); this.admin.set(location.pathname === '/admin'); if (this.admin()) void this.checkSession(); });
   }
   private syncAnswer() { this.answer.setValue(this.interview.currentAnswer(), { emitEvent: false }); }
-  openAdmin() { history.pushState({}, '', '/admin'); this.admin.set(true); void this.checkSession(); }
-  closeAdmin() { history.pushState({}, '', '/'); this.admin.set(false); this.adminPassword.setValue(''); this.records.set([]); this.selected.set(null); }
+  openAdmin() { if (this.speechLab) this.nova.cancelRecognition(); history.pushState({}, '', '/admin'); this.admin.set(true); void this.checkSession(); }
+  closeAdmin() { if (this.speechLab) this.nova.cancelRecognition(); history.pushState({}, '', '/'); this.admin.set(false); this.adminPassword.setValue(''); this.records.set([]); this.selected.set(null); }
   async openSetup() {
     if (this.checkingAvailability()) return;
     this.checkingAvailability.set(true); this.availabilityMessage.set('');

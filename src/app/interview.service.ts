@@ -3,7 +3,7 @@ import { Answer, Evaluation, QUESTIONS } from './interview.models';
 import { clearDraft, Draft, loadDraft, saveDraft } from './draft';
 import { clearResult, loadResult, saveResult } from './result-store';
 import { guestCsrf } from './session';
-import { SpeechService } from './speech.service';
+import { Nova3SpeechService } from './experiments/nova3-speech.service';
 import { QuestionAudioService } from './question-audio.service';
 export type Stage = 'welcome' | 'setup' | 'resume-draft' | 'interview' | 'evaluating' | 'offline-pending' | 'evaluation-error' | 'results';
 const RECOMMENDED_SECONDS = 8 * 60;
@@ -32,7 +32,7 @@ export class InterviewService {
   private id = '';
   private tickHandle: ReturnType<typeof setInterval> | undefined;
   private busy = false;
-  private speech = inject(SpeechService);
+  private speech = inject(Nova3SpeechService);
   private audio = inject(QuestionAudioService);
   private csrfForSubmission = inject(STUDENT_CSRF);
   constructor() {

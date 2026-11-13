@@ -1,5 +1,7 @@
 # Year 7 Mock Interview Hub: local QA and release status
 
+**Historical baseline:** This report predates the owner's decision to use Nova-3 by default. See [the current production source release](PRODUCTION_SOURCE_RELEASE_2026-11-13.md).
+
 Date: 13 November 2026, Asia/Dubai. Current source: `/Users/sunmarke/Downloads/year-7-mock-interview-hub -final1`.
 
 **Decision: LOCAL SOURCE READY FOR PRIVATE GITHUB REVIEW; CLASSROOM NO-GO.** This repository is a source backup/review candidate. It is not a deployed or fully exercised classroom service.

@@ -6,6 +6,7 @@
     "start": "ng serve",
     "dev": "ng serve --port 3000",
     "dev:mock": "node scripts/dev-mock.mjs",
+    "dev:nova3-trial": "node scripts/dev-nova3-trial.mjs",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",

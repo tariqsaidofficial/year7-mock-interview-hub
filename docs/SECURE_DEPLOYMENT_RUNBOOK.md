@@ -27,6 +27,8 @@ This document plans future deployment; it is not authority to deploy to Vercel o
 | `ADMIN_PASSWORD_HASH` | generated with `scripts/hash-admin-password.mjs` locally | yes | NEVER |
 | `OPENROUTER_API_KEY` | Owner-controlled project key | real AI only | NEVER |
 | `OPENROUTER_MODEL` | `anthropic/claude-haiku-5.5` | real AI only | example value okay |
+| `DEEPGRAM_API_KEY` | Owner's Member-level project key | Nova-3 token grants | NEVER |
+| `DEEPGRAM_LIVE_TRIAL` | Local Speech Lab launcher only | never in production | do not configure |
 | WIF/OIDC config | Owner + GCP IAM/Vercel documented setup | hosted backend | avoid treating generated short-lived tokens as project files |
 
 ## GitHub publication

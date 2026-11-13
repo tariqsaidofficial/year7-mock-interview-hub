@@ -5,6 +5,8 @@ import { getSession, validCsrf } from '../../server/session';
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') return respond(res, 405, { error: 'Method not allowed' });
   try {
+    const liveTrial = process.env['DEEPGRAM_LIVE_TRIAL'] === 'true';
+    if (liveTrial && !process.env['FIRESTORE_EMULATOR_HOST']) return respond(res, 503, { error: 'The bounded speech trial requires the local Firestore emulator.' });
     if (process.env['INTERVIEW_RUN_OPEN'] !== 'true') return respond(res, 403, { error: 'This classroom run is closed.' });
     const session = await getSession(req, 'guest');
     if (!session) return respond(res, 401, { error: 'Guest session expired. Please start again.' });
@@ -20,12 +22,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const counters = db().collection('interviewRuns').doc(runId()).collection('securityCounters');
     const sessionRef = counters.doc(`nova3-${minute}-${session.id}`);
     const sessionRunRef = counters.doc(`nova3-run-${session.id}`);
+    const trialRef = liveTrial ? counters.doc('nova3-live-trial-total') : null;
     const allowed = await db().runTransaction(async (tx) => {
-      const [own, ownRun] = await Promise.all([tx.get(sessionRef), tx.get(sessionRunRef)]);
-      if (Number(own.get('count') || 0) >= 3 || Number(ownRun.get('count') || 0) >= 16) return false;
+      const [own, ownRun, trial] = await Promise.all([tx.get(sessionRef), tx.get(sessionRunRef), trialRef ? tx.get(trialRef) : Promise.resolve(null)]);
+      if (Number(own.get('count') || 0) >= 3 || Number(ownRun.get('count') || 0) >= 16 || (trial && Number(trial.get('count') || 0) >= 2)) return false;
       const expiresAt = Date.now() + 3_600_000;
       tx.set(sessionRef, { count: Number(own.get('count') || 0) + 1, expiresAt });
       tx.set(sessionRunRef, { count: Number(ownRun.get('count') || 0) + 1 });
+      if (trialRef && trial) tx.set(trialRef, { count: Number(trial.get('count') || 0) + 1 });
       return true;
     });
     if (!allowed) return respond(res, 429, { error: 'Speech comparison limit reached. Please wait before trying again.' });

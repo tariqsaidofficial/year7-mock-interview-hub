@@ -1,0 +1,48 @@
+<div class="lab">
+  <header class="lab-hero">
+    <div class="lab-hero-copy">
+      <p class="lab-eyebrow"><app-ui-icon name="mic" /> Local adult speech test</p>
+      <h1>Speech recognition lab</h1>
+      <p>Compare your browser with Nova‑3 using the same spoken words. This page is for consenting adults only; it is separate from the Year 7 interview.</p>
+    </div>
+    <div class="lab-trial" aria-label="Nova-3 trial connections used">
+      <app-ui-icon name="clock" />
+      <span><strong>{{ nova.trialConnectionCount() }}/2</strong><small>Nova‑3 sessions used</small></span>
+    </div>
+  </header>
+
+  <div class="lab-notice" role="note"><app-ui-icon name="shield" /><p>Each Nova‑3 session stops after 90 seconds. Recording starts only when you press Start. No audio is saved by this app. Browser recognition may use your browser's speech provider.</p></div>
+
+  <section class="lab-card" aria-labelledby="lab-device-title">
+    <div class="lab-section-heading"><span class="lab-step">01</span><div><h2 id="lab-device-title">Prepare your microphone</h2><p>Choose the headset you intend to use and check that the browser can access it.</p></div><app-ui-icon name="headset" /></div>
+    <label class="lab-consent"><input type="checkbox" [formControl]="consent" /><span>I am an adult and consent to the selected provider processing my voice for this comparison.</span></label>
+    <div class="lab-grid lab-device-grid">
+      <div class="lab-field"><label for="nova-input">Nova‑3 microphone</label><select id="nova-input" [formControl]="inputDevice"><option value="">Browser default</option>@for (device of nova.availableMicrophones(); track device.id) { <option [value]="device.id">{{ device.label }}</option> }</select><small>Browser SpeechRecognition chooses its own input.</small></div>
+      <div class="lab-device-action"><button type="button" class="lab-button lab-button-secondary" [disabled]="!consent.value || browser.isListening() || nova.isListening()" (click)="inspectMicrophones()"><app-ui-icon name="refresh" /> Check devices</button><p><strong>Detected:</strong> {{ nova.selectedInputName() }}</p>@if (deviceError()) { <p class="lab-device-error" role="alert">{{ deviceError() }}</p> }</div>
+    </div>
+    <div class="lab-options"><div class="lab-field"><label for="capture-mode">Nova‑3 audio rate</label><select id="capture-mode" [formControl]="captureMode"><option value="native">Native device rate</option><option value="16k">Browser-resampled 16 kHz</option></select></div><div class="lab-field"><label for="endpointing">Pause detection</label><select id="endpointing" [formControl]="endpointing"><option value="natural">Provider default</option><option value="300">300 ms</option><option value="500">500 ms</option></select></div><p>Actual transmitted rate: <strong>{{ nova.actualSampleRate() || 'not started' }} Hz</strong>. Paid keyterms are disabled.</p></div>
+  </section>
+
+  <section class="lab-card" aria-labelledby="lab-reference-title">
+    <div class="lab-section-heading"><span class="lab-step">02</span><div><h2 id="lab-reference-title">Write the exact words spoken</h2><p>Include pauses, corrections and repeated words exactly as spoken. Update this after each run if you said something different.</p></div><app-ui-icon name="list" /></div>
+    <div class="lab-grid"><div class="lab-field"><label for="scenario">Speech scenario</label><select id="scenario" [formControl]="scenario"><option>Natural British English</option><option>Non-native English</option><option>Continuous speech</option><option>Deliberate pauses</option><option>Short answer</option><option>Similar-sounding words</option><option>Longer response</option></select></div></div>
+    <div class="lab-field"><label for="reference">Reference transcript</label><textarea id="reference" [formControl]="reference" rows="4" placeholder="Type the exact words you actually speak"></textarea></div>
+  </section>
+
+  <section class="lab-card" aria-labelledby="lab-record-title">
+    <div class="lab-section-heading"><span class="lab-step">03</span><div><h2 id="lab-record-title">Record each engine separately</h2><p>Speak the same material twice. Stop each recording before starting the other.</p></div><app-ui-icon name="volume" /></div>
+    <div class="lab-engine-grid">
+      <div class="lab-engine"><div class="lab-engine-heading"><app-ui-icon name="mic" /><div><h3>Browser recognition</h3><p>Uses your browser or device provider</p></div></div><div class="lab-actions"><button type="button" class="lab-button lab-button-primary" [disabled]="!canStart() || browser.isListening()" (click)="startBrowser()">Start browser</button><button type="button" class="lab-button lab-button-secondary" [disabled]="!browser.isListening()" (click)="stopBrowser()">Stop browser</button></div><p class="lab-status" role="status">{{ browser.status() }}</p><div class="lab-transcript"><span>Browser transcript</span><p>{{ browserText() || 'Words will appear here.' }}</p></div></div>
+      <div class="lab-engine"><div class="lab-engine-heading"><app-ui-icon name="headset" /><div><h3>Deepgram Nova‑3</h3><p>British English · no paid add-ons</p></div></div><div class="lab-actions"><button type="button" class="lab-button lab-button-primary" [disabled]="!canStart() || novaRunActive() || nova.trialConnectionCount() >= 2" (click)="startNova()">Start Nova‑3</button><button type="button" class="lab-button lab-button-secondary" [disabled]="!novaRunActive()" (click)="stopNova()">Stop Nova‑3</button></div><p class="lab-status" [class.lab-status-error]="nova.connectionErrors() > 0 || nova.status().includes('unavailable') || nova.status().includes('denied') || nova.status().includes('limit')" role="status" aria-live="polite">{{ nova.status() }}</p><div class="lab-transcript"><span>Confirmed words</span><p>{{ nova.confirmed() || 'Confirmed words will appear here.' }}</p></div><div class="lab-transcript lab-transcript-provisional"><span>Still checking</span><p>{{ nova.provisional() || 'Provisional words will appear here.' }}</p></div></div>
+    </div>
+    <p class="lab-help">If permission or connection fails, your words remain visible. Check the selected microphone, then use the browser engine or type the reference. A third Nova‑3 session is blocked.</p>
+  </section>
+
+  <section class="lab-card" aria-labelledby="lab-results-title">
+    <div class="lab-section-heading"><span class="lab-step">04</span><div><h2 id="lab-results-title">Compare the results</h2><p>WER measures word substitutions, deletions and insertions against your exact reference. Synthetic tests are not evidence of real speech accuracy.</p></div><app-ui-icon name="activity" /></div>
+    @if (runs().length) {
+      <div class="lab-table-scroll"><table><thead><tr><th scope="col">Engine</th><th scope="col">Scenario</th><th scope="col">WER</th><th scope="col">Ready</th><th scope="col">First interim</th><th scope="col">First final</th><th scope="col">Finalise</th><th scope="col">Final segments</th><th scope="col">Errors</th><th scope="col">Audio sent</th></tr></thead><tbody>@for (run of runs(); track $index) { <tr><td><strong>{{ run.engine }}</strong></td><td>{{ run.scenario }}</td><td><strong>{{ run.wer === null ? 'N/A' : (run.wer * 100).toFixed(1) + '%' }}</strong></td><td>{{ run.readyMs === null ? '—' : run.readyMs + ' ms' }}</td><td>{{ run.firstInterimMs === null ? '—' : run.firstInterimMs + ' ms' }}</td><td>{{ run.firstFinalMs === null ? '—' : run.firstFinalMs + ' ms' }}</td><td>{{ run.finalisationMs === null ? '—' : run.finalisationMs + ' ms' }}</td><td>{{ run.finalSegments }}</td><td>{{ run.connectionErrors }}</td><td>{{ run.audioSeconds.toFixed(1) }} s</td></tr> }</tbody></table></div>
+      <div class="lab-run-details">@for (run of runs(); track $index) { <details><summary>{{ run.engine }} · {{ run.scenario }} · {{ run.errors }}/{{ run.words }} word errors</summary><div class="lab-detail-grid"><p><strong>Exact reference</strong><br />{{ run.reference }}</p><p><strong>Transcript</strong><br />{{ run.transcript }}</p></div><p>Substitutions {{ run.substitutions }} · deletions {{ run.deletions }} · insertions {{ run.insertions }}. Provisional at stop: {{ run.provisionalAtStop ? 'Yes' : 'No' }}. Connection {{ run.connectionMs }} ms.</p><p>Microphone: {{ run.microphone }} · {{ run.sampleRate || 'unknown' }} Hz · {{ run.captureMode }} · pause detection {{ run.endpointing }}.</p></details> }</div>
+    } @else { <p class="lab-empty">Your comparison appears here after you stop a recording.</p> }
+  </section>
+</div>

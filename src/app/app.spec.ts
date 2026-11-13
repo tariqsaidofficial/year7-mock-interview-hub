@@ -2,11 +2,12 @@ import { TestBed } from '@angular/core/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from './app';
 import { SpeechService } from './speech.service';
+import { Nova3SpeechService } from './experiments/nova3-speech.service';
 import { QuestionAudioService } from './question-audio.service';
 
 describe('student screen', () => {
   function setup() {
-    TestBed.configureTestingModule({ imports: [App], providers: [{ provide: SpeechService, useValue: { status: () => 'Stopped', recognitionAvailable: () => false, isListening: () => false, stopRecognition: vi.fn() } }, { provide: QuestionAudioService, useValue: { message: () => 'Audio unavailable', state: () => 'unavailable', enterQuestion: vi.fn(), stop: vi.fn(), reset: vi.fn() } }] });
+    TestBed.configureTestingModule({ imports: [App], providers: [{ provide: SpeechService, useValue: { status: () => 'Browser fallback unused', recognitionAvailable: () => false, isListening: () => false, stopRecognition: vi.fn() } }, { provide: Nova3SpeechService, useValue: { status: () => 'Stopped', recognitionAvailable: () => false, isListening: () => false, stopRecognition: vi.fn(), cancelRecognition: vi.fn(), provisional: () => '', confirmed: () => '' } }, { provide: QuestionAudioService, useValue: { message: () => 'Audio unavailable', state: () => 'unavailable', enterQuestion: vi.fn(), stop: vi.fn(), reset: vi.fn() } }] });
     return TestBed.createComponent(App);
   }
   it('shows the fixed interview welcome screen and setup action', async () => {
@@ -14,6 +15,12 @@ describe('student screen', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Your Year 7 mock interview');
     expect(fixture.nativeElement.textContent).toContain('Get started');
+  });
+
+  it('uses Nova-3 for the normal interview without a query flag', () => {
+    const fixture = setup();
+    expect(fixture.componentInstance.speech).toBe(fixture.componentInstance.nova);
+    expect(fixture.componentInstance.useNova3).toBe(true);
   });
 
   it('warns before setup when the classroom run is closed or status cannot be checked', async () => {

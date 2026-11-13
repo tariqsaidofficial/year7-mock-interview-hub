@@ -45,4 +45,21 @@ describe('Nova-3 temporary token gate', () => {
     expect(JSON.stringify(state.body)).not.toContain('synthetic-server-only-key');
     expect(fetchMock.mock.calls[0][0]).toBe('https://api.deepgram.com/v1/auth/grant');
   });
+  it('requires an emulator and caps the live trial at two grants across the run', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ access_token: 'synthetic.jwt.token', expires_in: 30 }), { status: 200 })));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubEnv('DEEPGRAM_LIVE_TRIAL', 'true');
+    const { default: handler } = await import('../api/guest/nova3-token');
+    const noEmulator = response(); await handler(request, noEmulator.res);
+    expect(noEmulator.state.status).toBe(503); expect(fetchMock).not.toHaveBeenCalled();
+    vi.stubEnv('FIRESTORE_EMULATOR_HOST', '127.0.0.1:8085');
+    let trialCount = 0;
+    runTransaction.mockImplementation(async (callback) => callback({
+      get: async (ref: { id: string }) => ({ get: () => ref.id === 'nova3-live-trial-total' ? trialCount : 0 }),
+      set: (ref: { id: string }, value: { count: number }) => { if (ref.id === 'nova3-live-trial-total') trialCount = value.count; },
+    }));
+    const results = [];
+    for (let index = 0; index < 3; index++) { const item = response(); await handler(request, item.res); results.push(item.state.status); }
+    expect(results).toEqual([200, 200, 429]); expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });

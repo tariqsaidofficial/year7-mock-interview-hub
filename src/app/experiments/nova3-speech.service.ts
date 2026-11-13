@@ -17,6 +17,8 @@ export class Nova3SpeechService {
   readonly connectionReadyMs = signal<number | null>(null);
   readonly connectionDurationMs = signal(0);
   readonly audioSecondsSent = signal(0);
+  readonly finalisationDelayMs = signal<number | null>(null);
+  readonly trialConnectionCount = signal(0);
   readonly connectionErrors = signal(0);
   readonly finalSegments = signal(0);
   readonly selectedInputName = signal('Not checked');
@@ -25,6 +27,8 @@ export class Nova3SpeechService {
   captureMode: NovaCaptureMode = 'native';
   endpointing: NovaEndpointing = 'natural';
   useSunmarkeKeyterm = false;
+  boundedTrial = false;
+  onTrialHardStop: (() => void) | null = null;
   inputDeviceId = '';
   private generation = 0;
   private running = false;
@@ -43,8 +47,13 @@ export class Nova3SpeechService {
   private connectedAt = 0;
   private audioBytes = 0;
   private finalizeResolve: (() => void) | null = null;
+  private trialWatchdog: ReturnType<typeof setTimeout> | null = null;
+  private trialDeadline = 0;
+  private readonly trialStorageKey = 'y7-nova3-live-trial-connections';
+  private readonly pageLeave = () => this.cancelRecognition();
 
   isListening() { return this.running; }
+  trialConnectionsUsed() { return this.readTrialCount() ?? 2; }
 
   async inspectMicrophones() {
     if (!this.recognitionAvailable()) throw new Error('Microphone diagnostics require a secure browser context.');
@@ -60,18 +69,29 @@ export class Nova3SpeechService {
   startRecognition(onText: TranscriptCallback): boolean {
     if (!this.recognitionAvailable() || !navigator.onLine) { this.status.set('Speech comparison unavailable. You can type instead.'); return false; }
     if (this.running) return false;
+    if (this.boundedTrial && (this.readTrialCount() ?? 2) >= 2) { this.status.set('The two-session trial limit has been reached.'); return false; }
     const generation = ++this.generation;
     this.running = true; this.stopping = false; this.callback = onText;
     this.state = new NovaTranscript(); this.confirmed.set(''); this.provisional.set('');
-    this.firstFinalLatencyMs.set(null); this.firstInterimLatencyMs.set(null); this.connectionReadyMs.set(null); this.connectionDurationMs.set(0); this.audioSecondsSent.set(0); this.connectionErrors.set(0); this.finalSegments.set(0);
+    this.firstFinalLatencyMs.set(null); this.firstInterimLatencyMs.set(null); this.connectionReadyMs.set(null); this.connectionDurationMs.set(0); this.audioSecondsSent.set(0); this.finalisationDelayMs.set(null); this.connectionErrors.set(0); this.finalSegments.set(0);
     this.startedAt = Date.now(); this.connectedAt = 0; this.firstAudioAt = 0; this.audioBytes = 0;
+    if (this.boundedTrial) {
+      this.trialDeadline = this.startedAt + 90_000;
+      this.trialWatchdog = setTimeout(() => {
+        if (generation !== this.generation) return;
+        this.cancelRecognition();
+        this.status.set('Trial stopped automatically at 90 seconds.');
+        this.onTrialHardStop?.();
+      }, 90_000);
+      window.addEventListener('pagehide', this.pageLeave);
+    }
     try {
       // Construct and resume during the click gesture for iPad Safari.
       this.context = new AudioContext(this.captureMode === '16k' ? { sampleRate: 16_000 } : undefined);
       this.actualSampleRate.set(this.context.sampleRate);
       this.workletReady = this.context.audioWorklet.addModule('/experiments/nova3-pcm-worklet.js');
       void this.context.resume().catch(() => undefined);
-    } catch { this.running = false; this.status.set('Audio capture unavailable. You can type instead.'); return false; }
+    } catch { this.cancelRecognition(); this.status.set('Audio capture unavailable. You can type instead.'); return false; }
     this.status.set('Connecting to Nova-3…');
     void this.open(generation, 0);
     return true;
@@ -101,9 +121,14 @@ export class Nova3SpeechService {
       if (generation !== this.generation || this.stopping) return;
       const token = await this.token();
       if (generation !== this.generation || this.stopping) return;
+      if (this.boundedTrial && Date.now() >= this.trialDeadline) { this.cancelRecognition(); return; }
       const query = new URLSearchParams({ model: 'nova-3', language: 'en-GB', interim_results: 'true', punctuate: 'true', smart_format: 'true', encoding: 'linear16', sample_rate: String(this.context.sampleRate) });
       if (this.endpointing !== 'natural') query.set('endpointing', this.endpointing);
-      if (this.useSunmarkeKeyterm) query.append('keyterm', 'Sunmarke');
+      if (this.useSunmarkeKeyterm && !this.boundedTrial) query.append('keyterm', 'Sunmarke');
+      if (this.boundedTrial) {
+        const count = this.readTrialCount();
+        if (count === null || count >= 2 || !this.writeTrialCount(count + 1)) throw new Error('The two-session trial limit has been reached.');
+      }
       const socket = new WebSocket(`wss://api.deepgram.com/v1/listen?${query}`, ['bearer', token]);
       this.socket = socket;
       this.state.nextStream();
@@ -145,7 +170,7 @@ export class Nova3SpeechService {
         if (this.connectedAt) this.connectionDurationMs.set(Date.now() - this.connectedAt);
         this.socket = null; this.disconnectAudioGraph();
         if (this.stopping) { this.finalizeResolve?.(); return; }
-        if (reconnect < 1 && navigator.onLine) { this.status.set('Connection interrupted. Reconnecting once…'); void this.open(generation, reconnect + 1); }
+        if (!this.boundedTrial && reconnect < 1 && navigator.onLine) { this.status.set('Connection interrupted. Reconnecting once…'); void this.open(generation, reconnect + 1); }
         else { this.status.set('Speech connection stopped. Confirmed words remain; you can type or retry.'); void this.finish(generation); }
       };
     } catch (error) {
@@ -162,12 +187,14 @@ export class Nova3SpeechService {
     this.worklet?.port.postMessage('flush');
     const socket = this.socket;
     if (socket?.readyState === WebSocket.OPEN) {
+      const finalisationStarted = Date.now();
       await new Promise((resolve) => setTimeout(resolve, 100));
       await new Promise<void>((resolve) => {
         this.finalizeResolve = resolve;
         socket.send(JSON.stringify({ type: 'Finalize' }));
         setTimeout(() => resolve(), 2_000);
       });
+      this.finalisationDelayMs.set(Date.now() - finalisationStarted);
       if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'CloseStream' }));
     }
     await this.finish(this.generation);
@@ -178,6 +205,7 @@ export class Nova3SpeechService {
     if (generation !== this.generation) return;
     this.generation++;
     this.running = false; this.stopping = false; this.finalizeResolve = null;
+    this.clearTrialWatchdog();
     if (this.connectedAt) this.connectionDurationMs.set(Date.now() - this.connectedAt);
     this.disconnectAudioGraph();
     this.socket?.close(); this.socket = null;
@@ -188,6 +216,7 @@ export class Nova3SpeechService {
   // Use when the question/context changes: in-flight callbacks are invalidated immediately.
   cancelRecognition() {
     this.generation++; this.callback = null; this.running = false; this.stopping = false;
+    this.clearTrialWatchdog();
     this.disconnectAudioGraph();
     this.socket?.close(); this.socket = null;
     this.stream?.getTracks().forEach((track) => track.stop()); this.stream = null;
@@ -199,5 +228,21 @@ export class Nova3SpeechService {
     this.source?.disconnect(); this.source = null;
     this.worklet?.disconnect(); this.worklet = null;
     this.mute?.disconnect(); this.mute = null;
+  }
+
+  private clearTrialWatchdog() {
+    if (this.trialWatchdog) clearTimeout(this.trialWatchdog);
+    this.trialWatchdog = null;
+    if (typeof window !== 'undefined') window.removeEventListener('pagehide', this.pageLeave);
+  }
+
+  private readTrialCount(): number | null {
+    try { const count = Number(sessionStorage.getItem(this.trialStorageKey) || '0'); return Number.isInteger(count) && count >= 0 ? count : null; }
+    catch { return null; }
+  }
+
+  private writeTrialCount(count: number): boolean {
+    try { sessionStorage.setItem(this.trialStorageKey, String(count)); this.trialConnectionCount.set(count); return true; }
+    catch { return false; }
   }
 }
