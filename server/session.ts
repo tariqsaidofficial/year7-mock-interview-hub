@@ -60,13 +60,17 @@ export function validCsrf(req: ApiRequest, session: Session): boolean {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 async function createSession(req: ApiRequest, res: ApiResponse, role: Role) {
+  const candidate = newSession(req, role);
+  await sessions().doc(candidate.id).create(candidate.data);
+  setSessionCookie(res, role, candidate.token, Math.floor((candidate.expiresAt - Date.now()) / 1000));
+  return { csrf: candidate.csrf, expiresAt: candidate.expiresAt };
+}
+function newSession(req: ApiRequest, role: Role) {
   const token = randomBytes(32).toString('hex');
   const csrf = randomBytes(32).toString('hex');
   const expiresAt = Date.now() + (role === 'guest' ? GUEST_LIFETIME : ADMIN_LIFETIME);
   const id = digest(token);
-  await sessions().doc(id).create({ role, csrfHash: digest(csrf), expiresAt, runId: runId(), clientKey: clientKey(req), createdAt: Date.now() });
-  setSessionCookie(res, role, token, Math.floor((expiresAt - Date.now()) / 1000));
-  return { csrf, expiresAt };
+  return { token, csrf, expiresAt, id, data: { role, csrfHash: digest(csrf), expiresAt, runId: runId(), clientKey: clientKey(req), createdAt: Date.now() } };
 }
 export async function issueGuest(req: ApiRequest, res: ApiResponse) {
   if (process.env['INTERVIEW_RUN_OPEN'] !== 'true') return { kind: 'closed' as const };
@@ -75,9 +79,32 @@ export async function issueGuest(req: ApiRequest, res: ApiResponse) {
   const ip = clientKey(req);
   const hour = Math.floor(Date.now() / 3_600_000);
   const maxRun = Number(process.env['MAX_GUEST_SESSIONS'] || 40);
-  if (!Number.isInteger(maxRun) || maxRun < 1 || maxRun > 100) throw new Error('Guest limit unavailable');
+  if (!Number.isInteger(maxRun) || maxRun < 1 || maxRun > 40) throw new Error('Guest limit unavailable');
   const maxPerAddress = Number(process.env['MAX_GUEST_SESSIONS_PER_IP'] || maxRun);
   if (!Number.isInteger(maxPerAddress) || maxPerAddress < 1 || maxPerAddress > maxRun) throw new Error('Guest address limit unavailable');
+  if (maxPerAddress === maxRun) {
+    // One atomic slot per issued session bounds the run without a shared hot
+    // counter. The classroom's shared IP cannot exceed the run cap either.
+    const candidate = newSession(req, 'guest');
+    const slots = db().collection('interviewRuns').doc(runId()).collection('guestSlots');
+    const order = Array.from({ length: maxRun }, (_, index) => index);
+    for (let i = order.length - 1; i > 0; i--) { const j = randomBytes(4).readUInt32BE(0) % (i + 1); [order[i], order[j]] = [order[j], order[i]]; }
+    for (const index of order) {
+      const batch = db().batch();
+      batch.create(slots.doc(String(index)), { sessionId: candidate.id, clientKey: ip, createdAt: Date.now() });
+      batch.create(sessions().doc(candidate.id), candidate.data);
+      try {
+        await batch.commit();
+        setSessionCookie(res, 'guest', candidate.token, Math.floor((candidate.expiresAt - Date.now()) / 1000));
+        return { kind: 'created' as const, csrf: candidate.csrf, expiresAt: candidate.expiresAt };
+      } catch (error) {
+        if ((error as { code?: number }).code !== 6) throw error;
+      }
+    }
+    return { kind: 'limited' as const };
+  }
+  // Deliberately lower per-IP ceilings retain the transactional counter.
+  // Configure the ceiling before opening a run and keep it fixed for that run.
   const runRef = counters().doc('guest-total');
   const ipRef = counters().doc(`guest-${hour}-${ip}`);
   const allowed = await db().runTransaction(async (tx) => {

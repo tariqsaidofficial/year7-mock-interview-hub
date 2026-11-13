@@ -12,7 +12,13 @@ const mocks = vi.hoisted(() => {
     collection: (name: string) => ({ doc: (id: string) => ref(`${path}/${name}/${id}`) }),
   });
   const snapshot = (path: string) => ({ exists: documents.has(path), id: path.split('/').at(-1)!, data: () => documents.get(path), get: (field: string) => documents.get(path)?.[field] });
-  const db = () => ({ collection: (name: string) => ({ doc: (id: string) => ref(`${name}/${id}`) }), runTransaction: async (fn: (tx: unknown) => Promise<unknown>) => fn({ get: async (r: {path: string}) => snapshot(r.path), set: (r: {path: string}, value: Record<string, unknown>) => { documents.set(r.path, value); } }) });
+  const db = () => ({ collection: (name: string) => ({ doc: (id: string) => ref(`${name}/${id}`) }), batch: () => {
+    const pending: { path: string; value: Record<string, unknown> }[] = [];
+    return { create: (r: {path: string}, value: Record<string, unknown>) => { pending.push({ path: r.path, value }); }, commit: async () => {
+      if (pending.some((item) => documents.has(item.path))) throw Object.assign(new Error('exists'), { code: 6 });
+      for (const item of pending) documents.set(item.path, item.value);
+    } };
+  }, runTransaction: async (fn: (tx: unknown) => Promise<unknown>) => fn({ get: async (r: {path: string}) => snapshot(r.path), set: (r: {path: string}, value: Record<string, unknown>) => { documents.set(r.path, value); } }) });
   return { documents, db };
 });
 vi.mock('../server/firebase-admin', () => ({ db: mocks.db, runId: () => 'demo-run' }));

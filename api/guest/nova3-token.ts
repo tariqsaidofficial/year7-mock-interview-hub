@@ -11,22 +11,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (!validCsrf(req, session)) return respond(res, 403, { error: 'Request denied.' });
     const key = process.env['DEEPGRAM_API_KEY'];
     if (!key) return respond(res, 503, { error: 'Speech comparison is not configured.' });
+    const maxGuests = Number(process.env['MAX_GUEST_SESSIONS'] || 40);
+    if (!Number.isInteger(maxGuests) || maxGuests < 1 || maxGuests > 40) return safeError(res);
 
-    // Transactions enforce limits across serverless instances. A failed grant still consumes a slot.
+    // Per-session transactions avoid a shared classroom counter lock. The guest
+    // session ceiling bounds the run to at most 40 x 16 grants.
     const minute = Math.floor(Date.now() / 60_000);
     const counters = db().collection('interviewRuns').doc(runId()).collection('securityCounters');
     const sessionRef = counters.doc(`nova3-${minute}-${session.id}`);
-    const totalRef = counters.doc(`nova3-total-${minute}`);
     const sessionRunRef = counters.doc(`nova3-run-${session.id}`);
-    const totalRunRef = counters.doc('nova3-run-total');
     const allowed = await db().runTransaction(async (tx) => {
-      const [own, all, ownRun, allRun] = await Promise.all([tx.get(sessionRef), tx.get(totalRef), tx.get(sessionRunRef), tx.get(totalRunRef)]);
-      if (Number(own.get('count') || 0) >= 3 || Number(all.get('count') || 0) >= 60 || Number(ownRun.get('count') || 0) >= 12 || Number(allRun.get('count') || 0) >= 480) return false;
+      const [own, ownRun] = await Promise.all([tx.get(sessionRef), tx.get(sessionRunRef)]);
+      if (Number(own.get('count') || 0) >= 3 || Number(ownRun.get('count') || 0) >= 16) return false;
       const expiresAt = Date.now() + 3_600_000;
       tx.set(sessionRef, { count: Number(own.get('count') || 0) + 1, expiresAt });
-      tx.set(totalRef, { count: Number(all.get('count') || 0) + 1, expiresAt });
       tx.set(sessionRunRef, { count: Number(ownRun.get('count') || 0) + 1 });
-      tx.set(totalRunRef, { count: Number(allRun.get('count') || 0) + 1 });
       return true;
     });
     if (!allowed) return respond(res, 429, { error: 'Speech comparison limit reached. Please wait before trying again.' });

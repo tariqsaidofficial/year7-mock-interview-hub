@@ -8,11 +8,14 @@ import { adminCsrf } from './session';
 import { QuestionAudioService } from './question-audio.service';
 import { UiIconComponent, IconName } from './ui-icon.component';
 import { SpeechLabComponent } from './experiments/speech-lab.component';
+import { Nova3SpeechService } from './experiments/nova3-speech.service';
 @Component({ selector: 'app-root', changeDetection: ChangeDetectionStrategy.OnPush, imports: [ReactiveFormsModule, UiIconComponent, SpeechLabComponent], templateUrl: './app.html', styleUrl: './app.css' })
 export class App {
   readonly speechLab = typeof location !== 'undefined' && new URLSearchParams(location.search).has('speech-lab');
+  readonly useNova3 = typeof location !== 'undefined' && new URLSearchParams(location.search).has('nova3');
   readonly interview = inject(InterviewService);
-  readonly speech = inject(SpeechService);
+  readonly speech = this.useNova3 ? inject(Nova3SpeechService) : inject(SpeechService);
+  readonly nova = inject(Nova3SpeechService);
   readonly audio = inject(QuestionAudioService);
   readonly questions = QUESTIONS;
   categoryTitle(id: CategoryId) { return CATEGORIES.find((c) => c.id === id)?.title || id; }
@@ -21,6 +24,9 @@ export class App {
   readonly answersText = computed(() => this.interview.answers().map((item) => `Q${item.questionId}: ${item.text || '(No answer)'}`).join('\n\n'));
   readonly form = new FormGroup({ name: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.minLength(2), Validators.maxLength(80)] }), group: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(30)] }) });
   readonly answer = new FormControl('', { nonNullable: true });
+  readonly microphone = new FormControl('', { nonNullable: true });
+  readonly microphoneTestText = signal('');
+  readonly navigationBusy = signal(false);
   readonly adminPassword = new FormControl('', { nonNullable: true });
   readonly search = new FormControl('', { nonNullable: true });
   readonly sort = new FormControl('time', { nonNullable: true });
@@ -32,8 +38,9 @@ export class App {
   readonly availabilityMessage = signal(''); readonly checkingAvailability = signal(false);
   readonly visibleRecords = computed(() => { const term = this.searchValue().toLowerCase().trim(); return this.records().filter((r) => `${r.studentName} ${r.tutorGroup}`.toLowerCase().includes(term)).sort((a, b) => this.sortValue() === 'name' ? a.studentName.localeCompare(b.studentName) : this.sortValue() === 'group' ? a.tutorGroup.localeCompare(b.tutorGroup) : b.completedAt.localeCompare(a.completedAt)); });
   private recognitionBase = '';
+  private speechGeneration = 0;
   constructor() {
-    this.answer.valueChanges.subscribe((text) => { if (this.speech.isListening()) this.speech.stopRecognition(); this.interview.updateAnswer(text); });
+    this.answer.valueChanges.subscribe((text) => { if (this.speech.isListening()) { this.speechGeneration++; if (this.useNova3) (this.speech as Nova3SpeechService).cancelRecognition(); else void this.speech.stopRecognition(); } this.interview.updateAnswer(text); });
     if (this.admin()) void this.checkSession();
     window.addEventListener('popstate', () => { this.admin.set(location.pathname === '/admin'); if (this.admin()) void this.checkSession(); });
   }
@@ -52,23 +59,40 @@ export class App {
     } catch { this.availabilityMessage.set('The classroom status could not be checked. Please connect and try again.'); }
     finally { this.checkingAvailability.set(false); }
   }
-  start() { if (this.form.invalid) { this.form.markAllAsTouched(); return; } this.interview.start(this.form.controls.name.value, this.form.controls.group.value); this.syncAnswer(); }
+  start() { if (this.form.invalid) { this.form.markAllAsTouched(); return; } if (this.useNova3) this.nova.cancelRecognition(); this.interview.start(this.form.controls.name.value, this.form.controls.group.value); this.syncAnswer(); }
   resume() { this.interview.resume(); this.syncAnswer(); }
-  move(delta: number) { this.interview.move(delta); this.syncAnswer(); }
-  next() { this.interview.next(); this.syncAnswer(); }
-  clearDraft() { if (confirm('Clear your saved interview draft and answers from this device?')) { this.interview.clear(); this.answer.setValue('', { emitEvent: false }); } }
-  testQuestionAudio() { this.audio.test(); }
+  private clearNovaDisplay() { if (this.useNova3) { this.nova.confirmed.set(''); this.nova.provisional.set(''); } }
+  async move(delta: number) { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { await this.speech.stopRecognition(); this.speechGeneration++; this.interview.move(delta); this.syncAnswer(); this.clearNovaDisplay(); } finally { this.navigationBusy.set(false); } }
+  async next() { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { await this.speech.stopRecognition(); this.speechGeneration++; this.interview.next(); this.syncAnswer(); this.clearNovaDisplay(); } finally { this.navigationBusy.set(false); } }
+  clearDraft() { if (confirm('Clear your saved interview draft and answers from this device?')) { this.speechGeneration++; if (this.useNova3) this.nova.cancelRecognition(); this.interview.clear(); this.answer.setValue('', { emitEvent: false }); this.clearNovaDisplay(); } }
+  async replayQuestion() { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { await this.speech.stopRecognition(); this.speechGeneration++; this.audio.replay(this.interview.currentQuestion().id); } finally { this.navigationBusy.set(false); } }
+  async inspectMicrophones() { if (!this.useNova3) return; try { await this.nova.inspectMicrophones(); } catch { this.speech.status.set('Microphone devices could not be checked. You can type your answers.'); } }
+  testQuestionAudio() { if (this.useNova3) this.nova.cancelRecognition(); this.audio.test(); }
   async testMicrophone() {
+    if (this.useNova3) {
+      if (this.nova.isListening()) { await this.nova.stopRecognition(); return; }
+      this.microphoneTestText.set(''); this.nova.inputDeviceId = this.microphone.value;
+      this.nova.startRecognition(() => this.microphoneTestText.set(this.nova.confirmed()));
+      return;
+    }
     if (!navigator.mediaDevices?.getUserMedia) { this.speech.status.set('Microphone unavailable. You can type your answers.'); return; }
     try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); stream.getTracks().forEach((track) => track.stop()); this.speech.status.set('Microphone access is allowed. Speech recognition may mishear words; check and edit your answer.'); }
     catch { this.speech.status.set('Microphone permission denied. You can type your answers.'); }
   }
-  toggleMic() {
-    if (this.speech.isListening()) { this.speech.stopRecognition(); return; }
+  async toggleMic() {
+    if (this.navigationBusy()) return;
+    if (this.speech.isListening()) { this.navigationBusy.set(true); try { await this.speech.stopRecognition(); } finally { this.navigationBusy.set(false); } return; }
     this.audio.stop();
     this.recognitionBase = this.answer.value;
+    if (this.useNova3) (this.speech as Nova3SpeechService).inputDeviceId = this.microphone.value;
+    const generation = ++this.speechGeneration;
+    const questionId = this.interview.currentQuestion().id;
+    const startedAt = this.interview.startedAt();
     this.speech.startRecognition((transcript) => {
-      const value = [this.recognitionBase.trim(), transcript.trim()].filter(Boolean).join(' ');
+      if (generation !== this.speechGeneration || this.interview.stage() !== 'interview' || this.interview.currentQuestion().id !== questionId || this.interview.startedAt() !== startedAt) return;
+      const words = this.useNova3 ? (this.speech as Nova3SpeechService).confirmed() : transcript;
+      if (this.useNova3 && !words) return;
+      const value = [this.recognitionBase.trim(), words.trim()].filter(Boolean).join(' ');
       this.answer.setValue(value, { emitEvent: false }); this.interview.updateAnswer(value);
     });
   }

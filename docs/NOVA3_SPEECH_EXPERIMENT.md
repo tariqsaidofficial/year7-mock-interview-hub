@@ -1,46 +1,38 @@
-# Nova-3 speech proof of concept — local experiment
+# Nova-3 classroom performance experiment
 
-**Branch:** `experiment/nova3-speech` (local only). The production interview continues to use browser `SpeechRecognition`. This experiment is not a release approval.
+**Branch:** `experiment/nova3-speech`, local only. The normal application still uses Browser SpeechRecognition. `/?speech-lab` is an adult-consented comparison page; `/?nova3` enables the experimental recogniser in the interview. Neither is a production approval. Do not use real pupil audio in this branch.
 
-## What was built
+## Implementation and boundaries
 
-- An experiment-branch diagnostic at `/?speech-lab` with an adult-consent gate, exact per-run reference text, separate Browser SpeechRecognition and Nova-3 runs, transcripts and WER. It keeps data in page memory only; closing the tab removes it.
-- A `Nova3SpeechService` with the same start/stop/status/listening shape as the existing Angular service. It sends actual `AudioContext.sampleRate` with 16-bit mono PCM from an `AudioWorklet`; the browser cannot silently label 44.1 kHz audio as 16 kHz. The audio worklet runs on Chrome and browsers with the iPad Safari AudioWorklet/WebSocket/secure-context APIs. Actual physical iPad operation remains untested.
-- A CSRF-protected guest endpoint that exchanges a server-only `DEEPGRAM_API_KEY` for Deepgram's 30-second access token. The permanent key is never sent to the browser. Firestore transactions cap issuance to 3 per guest/minute, 60 per run/minute, 12 per guest/run and 480 per run. The classroom must be open.
-- Confirmed and provisional transcript state is separate. Final segments persist through pauses and one reconnect. Manual stop flushes pending PCM, sends `Finalize`, waits for a final result or a bounded timeout, then closes. If the provider does not finalise, provisional words remain visible and are flagged for review. `cancelRecognition()` invalidates callbacks immediately when a question/context changes.
+- The diagnostics enumerate audio inputs after microphone permission, display the active track label where the browser exposes it, and allow an exact device selection for Nova-3. Browser SpeechRecognition chooses its own input. The setup microphone test in `?nova3` now displays **confirmed words**, not only permission status. A user can stop that test before starting the interview.
+- The selected microphone is captured as mono with browser echo cancellation and noise suppression. The AudioWorklet converts the actual AudioContext output to signed 16-bit PCM. Native-rate and requested 16 kHz AudioContext modes are available for a measured comparison; the actual context sample rate is sent in the Deepgram URL and displayed. A browser that cannot open 16 kHz reports a capture error instead of falsely labelling its audio. AudioWorklet resampling quality and headset processing require real measurements.
+- Nova-3 uses `en-GB` and interim results. The lab compares provider-default, 300 ms and 500 ms endpointing, plus an optional fixed `Sunmarke` keyterm. No expected answer is sent to the provider as a hint. WER details show substitutions, deletions and insertions against the exact words spoken.
+- The chosen **provisional design is one WebSocket per question**. Microphone audio is sent only while that question's recording is active. Stopping flushes PCM, sends `Finalize`, waits up to two seconds for a final response, then sends `CloseStream`. Navigation waits for this stop before changing question. Replay stops recognition before starting the existing question MP3. Confirmed words are committed to the answer; provisional words are displayed separately and never committed. Late callbacks are rejected by recording generation, question ID and interview start time. Typing remains available, and “Continue speaking” or “Repeat my answer” offers voice recovery.
+- The reusable WebSocket hypothesis remains **unselected**. It would need intentional silent periods, documented KeepAlive traffic and question-boundary isolation tests. With no real Deepgram/network measurements, selecting it as more reliable would be unsupported. The current per-question approach avoids an idle open socket during narration or pauses, at the cost of ten handshakes and token grants per student. Token expiry after a successful connection is not treated as a reason to close the active socket; reconnect obtains a new grant.
+- The browser holds the temporary grant; the permanent `DEEPGRAM_API_KEY` stays server-side. Guest cookie, CSRF, same-origin, classroom-open and existing session limits remain required. The server issues at most **3 grants per guest per minute** and **16 per guest per run**. The run allows at most **40 guest sessions**, yielding a hard bound of 640 grants, including retries. The shared 60/minute and 480/run token counters were removed because they bottlenecked simultaneous classes and allowed too few retries. A guest session now atomically reserves one of 40 run slots when the per-IP ceiling equals the run ceiling, avoiding the old shared `guest-total` transaction hot spot. A deliberately lower per-IP limit retains the transactional path; configure limits before opening a fresh run and do not change them mid-run. The slot documents count issued sessions for the whole run and need planned expiry/cleanup after a run.
+- No raw audio is written to Firestore, localStorage or the repository. Browser draft answers remain local until the normal submission flow. No AI feedback model or live Firebase data was used in these checks.
 
-No raw audio is written to Firestore, localStorage or this repository. Typing remains available. No real pupil audio may be used in this experiment.
+## Evidence and limits
 
-## How to compare with adults
+| Check | Result | Meaning |
+|---|---|---|
+| Unit and server security checks | PASS | Local contracts and rate-limit behaviour. |
+| Chrome fake-microphone and mocked WebSocket | PASS | 16 kHz configuration, device diagnostics, interim/final, `Finalize`, WER calculation, Next/Back/Skip/Replay and late-callback isolation. Synthetic speech result is **not** accuracy evidence. |
+| Firestore emulator 1/5/15/30 guests with concurrent grants | PASS | No application 429; setup + grants took approximately 125/38/85/178 ms in one local run. Guest creation was sequential in those four cases; grants were concurrent. |
+| Firestore emulator 30 simultaneous guest starts | PASS | 49 ms in one local run; this measures the emulator only. A previous shared-counter version took about 20.5 seconds. |
+| Firestore emulator issuance limits | PASS | Four simultaneous grants for one guest produced three 200 and one 429. Forty slots were capped exactly. |
+| Actual Nova-3 connection and first-interim p95 | NOT RUN | No account/network trial; target remains under two seconds. |
+| Real WER across accents/scenarios and microphones | NOT RUN | No adult-consented provider comparison yet. |
+| Physical iPad Safari, school Wi-Fi and 30 provider streams | NOT RUN | No device/network/account access; cannot claim classroom compatibility or provider capacity. |
 
-1. Obtain adult consent and a separate Deepgram test project/key. Configure the key only in a private server environment. Keep `INTERVIEW_RUN_OPEN=true` only for the bounded synthetic run and use a synthetic guest identity. The local `dev:mock` command intentionally returns 503 for token issuance; it cannot measure Deepgram accuracy.
-2. Run the application under a configured `vercel dev` environment with same-origin HTTPS for a physical iPad. Open `/?speech-lab`. Never type a key into the page.
-3. For each scenario below, enter the **exact words actually spoken**, including deliberate repetitions, into the reference field. Run each engine separately using the same script at a comparable pace. Do not count a speaker's repeated words as recogniser insertions if they were spoken.
-4. Record WER per engine, time to first final result, missing final segments, connection errors, Chrome version, Safari/iPadOS version and microphone used. Repeat each scenario enough times to avoid judging from a single utterance. Keep reference/transcript pairs outside school systems only under the approved adult-test procedure.
+The lab has adult-consent gating and exact-reference fields for natural British English, non-native English, continuous speech, pauses, short answers, similar-sounding words and longer responses. Run both engines separately, record the words actually spoken including repetitions, and compare aggregate and per-scenario WER. Target WER ≤10%, preferably 5%, with no material accent or scenario regression; aim for a meaningful improvement over the browser engine. Use wired EarPods, Bluetooth earphones and ordinary headsets. Record first interim/final latency, lost final segments, errors, device name, sample rate and 16 kHz versus native rate. Browser samples/quality must be assessed on the physical devices. Do not label mocked 0% WER as recognition accuracy.
 
-| Adult speech scenario | Browser WER | Nova-3 WER | Latency / lost finals / errors | Result |
-|---|---:|---:|---|---|
-| Natural British English | Not run | Not run | Not measured | No accuracy conclusion |
-| Non-native English | Not run | Not run | Not measured | No accuracy conclusion |
-| Continuous speech | Not run | Not run | Not measured | No accuracy conclusion |
-| Deliberate pauses | Not run | Not run | Not measured | No accuracy conclusion |
-| Short answers | Not run | Not run | Not measured | No accuracy conclusion |
-| Similar-sounding words | Not run | Not run | Not measured | No accuracy conclusion |
-| Longer responses | Not run | Not run | Not measured | No accuracy conclusion |
+The emulator checks do **not** prove 30 distinct microphone streams, 30 provider WebSockets, p95 latency, school upload bandwidth or actual account allocation. Deepgram's [published Pay-as-you-go rate limits](https://developers.deepgram.com/reference/api-rate-limits) list up to 150 Nova-3 streaming requests on a primary project, but a secondary self-serve project can be limited to one. Confirm the **actual project** allocation and run a consented 30-stream network trial before any classroom recommendation. The app has no hidden queue; network/provider failures retain confirmed answers and typing.
 
-The browser mock test used a synthetic transcript and produced 0% WER by construction. **That is a software-contract test, not recognition accuracy evidence.** No adult speech, provider request, or physical iPad test occurred in this implementation session.
+## Trial credit and release gate
 
-## Decision threshold and 30-session plan
+The [current promotional price table](https://deepgram.com/pricing) lists Nova-3 monolingual at **$0.0048 per processed minute**, with optional keyterm prompting at **$0.0013 per minute**. A deliberately bounded **10-minute adult trial** would cost approximately **$0.048**, or **$0.061** with keyterm prompting, assuming ten processed minutes and the published rate. Thirty students × eight minutes of continuous audio would be **$1.152** base, or **$1.464** with keyterms; actual billable audio and contract pricing must be checked in the project. The pricing page also contains an inconsistent per-hour FAQ, so confirm the project quote before spending.
 
-Recommend production integration only after the same consented-adult corpus shows a meaningful reduction in aggregate WER (target at least 20% relative), no material regression in any scenario, no lost confirmed segments, acceptable first-final latency and errors, and a successful physical iPad Safari test. A teacher must review the reference/transcript pairs. Even if those pass, approval of external adult/pupil audio processing is separate.
+**Do not start any paid/trial-credit provider request without the owner's explicit approval after this estimate.** No Deepgram accuracy trial, OpenRouter request, payment change, production Firebase write, GitHub push, merge or deployment has been performed for this optimisation. Nova-3 remains **NO-GO for merging** until real adult WER, physical iPad Safari, 30-stream actual-account and school Wi-Fi measurements pass.
 
-The local token gate permits 30 simultaneous first connections within its 60-per-minute run ceiling. Deepgram's public Pay-as-You-Go documentation currently lists **up to 150 concurrent Nova-3 streams per primary project**, but secondary self-serve projects can be limited to **one**. The actual test account's project tier, region, available concurrency, billing cap and rate-limit responses have **not** been verified. Before any 30-device classroom test, confirm the actual project limit in Deepgram, keep a 30+reconnect margin, run 30 consented/synthetic concurrent connections, measure 429s and finalisation, and set an approved cost ceiling. Do not bypass a limit with extra projects.
-
-## Local verification
-
-- Lint, client/server typechecks, 21 Angular tests and 33 server tests passed on the experiment branch.
-- Chrome headless with a localhost mock API: adult-consent gate and safe 503 token failure passed; no request reached Deepgram.
-- Chrome headless with a fully mocked WebSocket: interim/final assembly, `Finalize` on stop and synthetic WER calculation passed. No real audio was sent externally.
-- Live Deepgram WER, provider limits, physical iPad Safari, 30 concurrent sessions and production speech replacement: **NOT RUN**.
-
-Primary references: [Deepgram temporary token grant](https://developers.deepgram.com/guides/fundamentals/token-based-authentication), [Nova-3 live audio](https://developers.deepgram.com/reference/speech-to-text/listen-streaming), [audio encoding](https://developers.deepgram.com/docs/encoding/), [current rate limits](https://developers.deepgram.com/reference/api-rate-limits).
+References: [temporary token guide](https://developers.deepgram.com/guides/fundamentals/token-based-authentication), [endpointing and final results](https://developers.deepgram.com/docs/understand-endpointing-interim-results), [KeepAlive](https://developers.deepgram.com/docs/audio-keep-alive), [rate limits](https://developers.deepgram.com/reference/api-rate-limits), [pricing](https://deepgram.com/pricing).
