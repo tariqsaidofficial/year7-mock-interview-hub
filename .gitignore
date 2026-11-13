@@ -1,0 +1,77 @@
+# See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+# Env variables
+.env*
+!.env.example
+
+# Compiled output
+/dist
+/tmp
+/out-tsc
+/bazel-out
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# IDEs and editors
+.idea/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.history/*
+
+# Miscellaneous
+/.angular/cache
+.sass-cache/
+/connect.lock
+/coverage
+/libpeerconnection.log
+testem.log
+/typings
+__screenshots__/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Firebase local CLI and emulator logs
+/.firebase/
+/firebase-debug.log
+/firestore-debug.log
+
+# Hosting state, local credentials and private QA captures
+/.vercel/
+**/application_default_credentials.json
+**/*service-account*.json
+**/*service_account*.json
+**/*firebase-adminsdk*.json
+**/id_rsa
+**/id_ed25519
+*.pem
+*.p12
+*.pfx
+*.log
+*.har
+**/storage-state*.json
+**/session-cookies*.json
+/playwright-report/
+/test-results/
+/qa-artifacts/
+
+# Local AI Studio and design-tool working files; not application source
+/.aistudio/
+/.impeccable/hook.cache.json
+/metadata.json
+/year7_mock_interview_codex_master_prompt.md

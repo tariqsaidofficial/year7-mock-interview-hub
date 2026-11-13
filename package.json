@@ -1,0 +1,51 @@
+{
+  "name": "ai-studio-angular-app",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "dev": "ng serve --port 3000",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test",
+    "lint": "ng lint",
+    "typecheck": "ngc -p tsconfig.app.json --noEmit",
+    "test:server": "vitest run qa/contract.test.ts qa/draft.test.ts qa/api-auth.test.ts qa/teacher-auth.test.ts qa/evaluate-idempotency.test.ts qa/session-security.test.ts qa/firebase-admin-adc.test.ts --environment node",
+    "typecheck:server": "tsc --noEmit --target ES2022 --module node16 --moduleResolution node16 --strict --skipLibCheck server/*.ts api/*.ts api/admin/*.ts api/guest/*.ts"
+  },
+  "private": true,
+  "dependencies": {
+    "@angular/common": "^21.0.0",
+    "@angular/compiler": "^21.0.0",
+    "@angular/core": "^21.0.0",
+    "@angular/forms": "^21.0.0",
+    "@angular/platform-browser": "^21.0.0",
+    "@lucide/angular": "^1.72.0",
+    "firebase-admin": "^14.5.1",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.0.0",
+    "@angular/cli": "^21.0.0",
+    "@angular/compiler-cli": "^21.0.0",
+    "@firebase/rules-unit-testing": "^6.0.0",
+    "@tailwindcss/postcss": "^4.1.12",
+    "@types/node": "^20.17.19",
+    "angular-eslint": "21.1.0",
+    "eslint": "^9.39.1",
+    "jsdom": "^27.0.0",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^4.1.12",
+    "typescript": "~5.9.2",
+    "typescript-eslint": "8.47.0",
+    "vitest": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=24.12.0"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "1.14.7"
+  }
+}

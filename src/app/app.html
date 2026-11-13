@@ -1,0 +1,132 @@
+<div class="page-shell">
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="wordmark">
+        <span class="wordmark-icon"><app-ui-icon name="school" /></span>
+        <div><strong>Year 7 Mock Interview</strong><span>Sunmarke School · Transition & Growth Hub</span></div>
+      </div>
+      @if (!admin() && interview.stage() === 'interview') {
+        <div class="header-progress"><app-ui-icon name="list" /><span>Question {{ interview.index() + 1 }} of 10</span></div>
+      }
+      <div class="header-actions">
+        @if (admin()) {
+          <button class="quiet-button" type="button" (click)="closeAdmin()"><app-ui-icon name="back" /> Student view</button>
+        } @else {
+          @if (interview.stage() === 'interview') {
+            <span class="student-pill"><app-ui-icon name="user" /><span>{{ interview.name() }} <small>· {{ interview.group() }}</small></span></span>
+            <button class="quiet-button restart-button" type="button" aria-label="Restart interview" (click)="clearDraft()"><app-ui-icon name="refresh" /><span>Restart</span></button>
+          } @else {
+            <button class="quiet-button" type="button" (click)="openAdmin()"><app-ui-icon name="shield" /><span>Teacher</span></button>
+          }
+        }
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    @if (admin()) {
+      <section class="surface-card admin-card">
+        <div class="section-heading"><div><p class="eyebrow">Protected teacher area</p><h1>Session records</h1><p class="muted">Review temporary answers and feedback for this session.</p></div><span class="heading-icon"><app-ui-icon name="shield" /></span></div>
+        @if (!signedIn()) { <form (submit)="$event.preventDefault(); signIn()"><label class="field-label" for="admin-password">Administrator password</label><input id="admin-password" class="text-field" type="password" autocomplete="current-password" [formControl]="adminPassword" /><button type="submit" class="primary-button">Sign in <app-ui-icon name="arrow" /></button></form> }
+        @else {
+          <div class="admin-toolbar"><button type="button" class="secondary-button" (click)="refresh()"><app-ui-icon name="refresh" /> Refresh</button><button type="button" class="secondary-button" (click)="signOutTeacher()">Sign out</button>@if (runId()) { <span class="muted">{{ runId() }} · {{ records().length }} completed · {{ pendingCount() }} pending/error</span> }</div>
+          @if (loading()) { <p role="status">Loading records…</p> }
+          <div class="admin-filters"><div><label for="record-search" class="field-label">Search by name or form group</label><input id="record-search" class="text-field" [formControl]="search" /></div><div><label for="record-sort" class="field-label">Sort records</label><select id="record-sort" class="text-field" [formControl]="sort"><option value="time">Most recent</option><option value="name">Student name</option><option value="group">Form group</option></select></div></div>
+          @if (!loading() && records().length === 0 && runId()) { <p class="muted">No completed interviews in this session yet.</p> }
+          <div class="record-grid"><div class="record-list" aria-label="Student records">@for (record of visibleRecords(); track record.id) { <button type="button" class="record-button" (click)="selected.set(record)"><strong>{{ record.studentName }}</strong><span>{{ record.tutorGroup }} · {{ record.completedAt }}</span></button> }</div>
+            @if (selected(); as record) { <section class="record-detail"><h2>{{ record.studentName }} · {{ record.tutorGroup }}</h2><p class="muted">Completed {{ record.completedAt }}</p>
+              @for (answer of record.answers; track answer.questionId) { <div class="answer-row"><strong>Q{{ answer.questionId }}. {{ questions[answer.questionId - 1].text }}</strong><p>{{ answer.text || 'No answer' }}</p></div> }
+              <h3>Feedback</h3>@for (category of record.evaluation.categories; track category.categoryId) { <p><strong>{{ categoryTitle(category.categoryId) }}: {{ category.indicator }}</strong><br>{{ category.evidence }}<br>{{ category.nextStep }}</p> }
+              <h3>What went well</h3>@for (strength of record.evaluation.whatWentWell; track $index) { <p>{{ strength }}</p> } @empty { <p>Not enough evidence yet to highlight a specific strength.</p> }<h3>Even better if</h3><p>{{ record.evaluation.evenBetterIf }}</p><h3>Summary</h3><p>{{ record.evaluation.overallSummary }}</p>
+              <button type="button" class="primary-button" (click)="copyRecord()"><app-ui-icon name="copy" /> Copy feedback</button><textarea class="text-field copy-box" readonly aria-label="Selectable feedback text">{{ record.evaluation.formattedCopyableText }}</textarea>
+            </section> }
+          </div>
+          @if (runId()) { <div class="admin-clear"><p class="muted">Central records remain until you clear this session.</p><button type="button" class="danger-button" (click)="clearRecords()">Clear this session's records</button></div> }
+        }
+        <p role="status" aria-live="polite">{{ adminMessage() }}</p>
+      </section>
+    } @else {
+      @if (interview.stage() === 'welcome') {
+        <div class="page-stack">
+          <section class="surface-card welcome-card">
+            <p class="eyebrow"><app-ui-icon name="sparkles" /> British curriculum · Year 7 reflection</p>
+            <h1 class="hero-title">Your Year 7 mock interview</h1>
+            <p class="hero-lead">A friendly conversation about settling into secondary school, favourite subjects, activities and helping others. There are no grades. Share your own experiences, at your own pace.</p>
+            <div class="welcome-note"><app-ui-icon name="info" /><p>Everyone answers the same ten questions. Aim for about eight minutes for the questions, then copy your feedback to your school platform.</p></div>
+            <div class="category-grid" aria-label="Interview topics">
+              @for (category of categories; track category.id; let idx = $index) {
+                <div class="category-preview" [class]="'category-preview tone-' + category.id"><span class="preview-icon"><app-ui-icon [name]="categoryIcon(category.id)" /></span><span class="preview-number">0{{ idx + 1 }}</span><h2>{{ category.title }}</h2><p>{{ category.id === 'transition' ? 'Changes, routines and small challenges.' : category.id === 'subjects' ? 'Lessons and work you enjoy.' : category.id === 'activities' ? 'Things you enjoy or might like to try.' : 'Helping others and taking responsibility.' }}</p></div>
+              }
+            </div>
+            <button type="button" class="primary-button welcome-action" (click)="openSetup()" [disabled]="checkingAvailability()">{{ checkingAvailability() ? 'Checking classroom status…' : 'Get started' }} <app-ui-icon name="arrow" /></button>
+            <p role="status" aria-live="polite">{{ availabilityMessage() }}</p>
+          </section>
+        </div>
+      }
+
+      @if (interview.stage() === 'setup') {
+        <div class="page-stack">
+          <section class="surface-card form-card">
+            <div class="section-heading"><div><p class="eyebrow">Before you begin</p><h1>Student details</h1><p class="muted">Just enough information for your teacher to find your temporary interview record.</p></div><span class="heading-icon"><app-ui-icon name="user" /></span></div>
+            <form [formGroup]="form" (ngSubmit)="start()" id="setup-form">
+              <div class="form-grid"><div><label class="field-label" for="name">Your name <span aria-hidden="true">*</span></label><input id="name" class="text-field" autocomplete="name" maxlength="80" placeholder="e.g. your first and last name" [formControl]="form.controls.name" />@if (form.controls.name.touched && form.controls.name.invalid) { <p class="field-error">Please enter your name, at least two characters.</p> }</div><div><label class="field-label" for="group">Tutor / form group <span aria-hidden="true">*</span></label><input id="group" class="text-field" maxlength="30" placeholder="e.g. 7A" [formControl]="form.controls.group" />@if (form.controls.group.touched && form.controls.group.invalid) { <p class="field-error">Please enter your form group.</p> }</div></div>
+              <p class="privacy-note"><app-ui-icon name="shield" /> Your name helps your teacher identify this temporary record. It is not sent to the feedback model.</p>
+            </form>
+          </section>
+          <section class="surface-card readiness-card"><div class="section-heading"><div><p class="eyebrow">Device readiness</p><h2>Hear the question. Answer your way.</h2><p class="muted">Put on headphones and check your volume. You can speak on supported devices or type every answer.</p></div><span class="heading-icon"><app-ui-icon name="headset" /></span></div>
+            <div class="readiness-actions"><button type="button" class="secondary-button" (click)="testQuestionAudio()"><app-ui-icon name="volume" /> Test question audio</button><button type="button" class="secondary-button" (click)="testMicrophone()"><app-ui-icon name="mic" /> Test microphone</button></div>
+            <p class="audio-status" role="status" aria-live="polite">{{ audio.message() }}</p><p class="audio-status" role="status" aria-live="polite">{{ speech.status() }}</p><p class="muted">Speech recognition may use your browser or device provider and may need an internet connection. This app does not save audio.</p>
+          </section>
+          <div class="setup-actions"><button type="button" class="quiet-button" (click)="interview.stage.set('welcome')"><app-ui-icon name="back" /> Back</button><button type="submit" form="setup-form" class="primary-button">Start interview <app-ui-icon name="arrow" /></button></div>
+        </div>
+      }
+
+      @if (interview.stage() === 'resume-draft') {
+        <section class="surface-card resume-card"><p class="eyebrow">Saved on this device</p><h1>Welcome back</h1><p>Your answers are still here. The suggested eight-minute countdown continues from when you started, but there is no time limit.</p><div class="time-guide"><app-ui-icon name="clock" /><strong>{{ interview.timeText() }}</strong><span>{{ interview.pastGuide() ? 'suggested time reached' : 'time left' }}</span></div><div class="action-row"><button type="button" class="primary-button" (click)="resume()">Resume interview <app-ui-icon name="arrow" /></button><button type="button" class="secondary-button" (click)="clearDraft()">Clear my draft</button></div></section>
+      }
+
+      @if (interview.stage() === 'interview') {
+        <div class="page-stack interview-stack">
+          <section class="interview-context surface-card"><div class="context-topic"><span class="context-icon" [class]="'context-icon tone-' + interview.currentQuestion().categoryId"><app-ui-icon [name]="categoryIcon(interview.currentQuestion().categoryId)" /></span><div><p class="eyebrow">{{ categoryTitle(interview.currentQuestion().categoryId) }}</p><strong>Question {{ interview.index() + 1 }} of 10</strong></div></div><div class="context-meta"><span class="step-pill"><app-ui-icon name="list" /> {{ interview.index() + 1 }} / 10</span><span class="time-guide" [class.time-guide-complete]="interview.pastGuide()" [attr.aria-label]="interview.pastGuide() ? 'Suggested time reached. You may keep going.' : interview.timeText() + ' remaining in the suggested eight minutes'"><app-ui-icon name="clock" /><strong>{{ interview.timeText() }}</strong><span>{{ interview.pastGuide() ? 'suggested time reached' : 'time left' }}</span></span></div></section>
+          <section class="progress-card surface-card" aria-label="Interview progress"><div class="progress-labels"><span>Interview progress</span><strong>Question {{ interview.index() + 1 }} of 10</strong></div><div class="progress-segments">@for (question of questions; track question.id; let idx = $index) { <span [class]="idx === interview.index() ? 'current' : idx < interview.index() ? 'completed' : ''" [attr.aria-label]="'Question ' + question.id + (idx === interview.index() ? ', current' : idx < interview.index() ? ', visited' : ', upcoming')"></span> }</div></section>
+          @if (interview.nearGuide()) { <p class="gentle-reminder" role="status"><app-ui-icon name="clock" /> {{ interview.pastGuide() ? 'The suggested eight minutes have passed. Take the time you need, then finish when you are ready.' : 'About 30 seconds remain in the suggested time. You can keep going if you need to.' }}</p> }
+          @if (!interview.online()) { <p class="gentle-reminder" role="status"><app-ui-icon name="info" /> {{ interview.message() || 'Your answers stay on this device while you are offline. Feedback needs a connection.' }}</p> }
+          <section class="surface-card question-card"><div class="question-top"><div><p class="eyebrow">Question {{ interview.index() + 1 }}</p><h1>{{ interview.currentQuestion().text }}</h1></div><button type="button" class="replay-button" (click)="audio.replay(interview.currentQuestion().id)"><app-ui-icon name="replay" /><span>Replay question</span></button></div>
+            <p class="audio-status" role="status" aria-live="polite"><app-ui-icon name="volume" /> {{ audio.message() }}</p>
+            <details class="hint"><summary><app-ui-icon name="lightbulb" /> Need a hint?</summary><div class="hint-content">{{ interview.currentQuestion().hint }}</div></details>
+            <div class="response-studio" [class.listening]="speech.isListening()"><div class="studio-main"><button type="button" class="microphone-button" [class.active]="speech.isListening()" [disabled]="!speech.recognitionAvailable() || !interview.online()" [attr.aria-label]="speech.isListening() ? 'Stop speech recognition' : 'Start speech recognition'" (click)="toggleMic()"><app-ui-icon [name]="speech.isListening() ? 'stop' : 'mic'" /></button><div><strong>{{ speech.isListening() ? 'Listening to your answer' : 'Speak your answer' }}</strong><p>{{ speech.isListening() ? 'Your words appear below as you speak. Tap the button to stop.' : 'Tap the microphone, or type in the box below.' }}</p></div></div><span class="speech-status" [class.live]="speech.isListening()" role="status" aria-live="polite">{{ speech.status() }}</span></div>
+            @if (!speech.recognitionAvailable()) { <p class="muted">Speech recognition is not available on this device. Typing works throughout the interview.</p> }
+            <div class="answer-field"><div class="answer-label"><label class="field-label" for="answer">Your answer <span>(spoken words or your own typing)</span></label><span>{{ answer.value.trim() ? answer.value.trim().split(' ').length : 0 }} words</span></div><textarea id="answer" class="text-field" [formControl]="answer" maxlength="1200" rows="5" placeholder="Your words appear here. You can also type or edit your answer."></textarea></div>
+            <div class="question-actions"><button type="button" class="secondary-button" [disabled]="interview.index() === 0" (click)="move(-1)"><app-ui-icon name="back" /> Back</button><div class="question-actions-right">@if (interview.index() !== 9) { <button type="button" class="secondary-button" (click)="next()">Skip</button><button type="button" class="primary-button" (click)="next()">Next question <app-ui-icon name="arrow" /></button> } @else { <button type="button" class="primary-button" (click)="next()">Finish Interview <app-ui-icon name="arrow" /></button> }</div></div>
+          </section>
+          <button type="button" class="text-link" (click)="clearDraft()">Clear my draft from this device</button>
+        </div>
+      }
+
+      @if (interview.stage() === 'evaluating') {
+        <section class="surface-card status-card analysis-card" role="status" aria-live="polite" aria-atomic="true">
+          <div class="analysis-visual" aria-hidden="true"><span class="analysis-ring outer"></span><span class="analysis-ring inner"></span><span class="analysis-core"><app-ui-icon name="sparkles" /></span></div>
+          <p class="eyebrow">Interview complete</p><h1>Preparing your feedback<span class="analysis-dots" aria-hidden="true">…</span></h1>
+          <p>We're preparing helpful feedback from the answers you shared. This may take a little time.</p>
+          <ul class="analysis-themes" aria-label="The four interview topics">@for (category of categories; track category.id) { <li [class]="'analysis-theme tone-' + category.id"><app-ui-icon [name]="categoryIcon(category.id)" /> {{ category.title }}</li> }</ul>
+          @if (!interview.savedOnDevice()) { <p class="storage-warning">This device could not save your answers. Keep this page open and copy them if feedback is unavailable.</p> }
+          <p class="analysis-note">This is a reflection, not a test.</p>
+        </section>
+      }
+      @if (interview.stage() === 'offline-pending' || interview.stage() === 'evaluation-error') { <section class="surface-card status-card"><span class="heading-icon"><app-ui-icon name="info" /></span><p class="eyebrow">Interview paused</p><h1>Feedback is not ready yet</h1><p role="status">{{ interview.message() }}</p>@if (!interview.savedOnDevice()) { <p class="storage-warning">This device could not save your answers. Copy them before leaving this page.</p> }<div class="action-row"><button type="button" class="primary-button" (click)="interview.submit()" [disabled]="!interview.online()">Retry feedback</button><button type="button" class="secondary-button" (click)="interview.copyAnswers()"><app-ui-icon name="copy" /> Copy my answers</button></div><p aria-live="polite">{{ interview.copyMessage() }}</p><textarea class="text-field copy-box" readonly aria-label="Selectable answer text">{{ answersText() }}</textarea></section> }
+      @if (interview.stage() === 'results' && interview.evaluation(); as evaluation) {
+        <div class="page-stack results-stack"><section class="results-hero surface-card"><div><p class="eyebrow"><app-ui-icon name="sparkles" /> Your reflection</p><h1>Thank you, {{ interview.name() }}</h1><p>Here is feedback based on the answers you shared. Take it with you to your school platform.</p></div><button type="button" class="primary-button" (click)="interview.copyFeedback()"><app-ui-icon name="copy" /> Copy feedback</button></section><p class="copy-notice" role="status" aria-live="polite">{{ interview.copyMessage() }}</p>
+          @if (!interview.resultSaved() || !interview.savedOnDevice()) { <p class="storage-warning" role="status">This device could not keep your feedback for a refresh. Please copy it before closing this page.</p> }
+          <section class="surface-card snapshot-card" aria-labelledby="snapshot-title"><div class="section-heading"><div><p class="eyebrow">Your reflection at a glance</p><h2 id="snapshot-title">Interview snapshot</h2></div><span class="snapshot-note">No marks or grades</span></div>
+            <div class="snapshot-facts"><div><strong>{{ evaluation.categories.length }}</strong><span>topics in this report</span></div><div><strong>{{ evaluation.whatWentWell.length }}</strong><span>strengths supported by answers</span></div><div><app-ui-icon name="arrow" /><span>An achievable next step</span></div></div>
+            <h3>Evidence from your answers</h3><div class="snapshot-map">@for (category of evaluation.categories; track category.categoryId) { <div class="snapshot-topic" [class]="'snapshot-topic tone-' + category.categoryId"><app-ui-icon [name]="categoryIcon(category.categoryId)" /><span><strong>{{ categoryTitle(category.categoryId) }}</strong><small>{{ category.indicator }}</small></span></div> }</div>
+          </section>
+          <section class="surface-card detailed-feedback"><div class="section-heading"><div><p class="eyebrow">Four areas of reflection</p><h2>Your interview evidence</h2><p class="muted">These descriptions reflect what you shared. They are not grades.</p></div></div><div class="feedback-grid">@for (category of evaluation.categories; track category.categoryId) { <article class="feedback-card" [class]="'feedback-card tone-' + category.categoryId"><span class="preview-icon"><app-ui-icon [name]="categoryIcon(category.categoryId)" /></span><h3>{{ categoryTitle(category.categoryId) }}</h3><span class="indicator" [class.insufficient]="category.indicator === 'Not enough evidence'">{{ category.indicator }}</span><p>{{ category.evidence }}</p><p class="next-step"><strong>Try next</strong> {{ category.nextStep }}</p></article> }</div></section>
+          <div class="strength-grid"><section class="surface-card"><p class="eyebrow">What went well</p><h2>Strengths from your answers</h2>@if (evaluation.whatWentWell.length) { <ol class="strength-list">@for (strength of evaluation.whatWentWell; track $index) { <li>{{ strength }}</li> }</ol> } @else { <p>Not enough evidence yet to highlight a specific strength.</p> }</section><section class="surface-card improvement-card"><p class="eyebrow">Even better if</p><h2>One small next step</h2><p>{{ evaluation.evenBetterIf }}</p></section></div>
+          <section class="surface-card summary-card"><p class="eyebrow">Your summary</p><h2>A note you can keep</h2><p>{{ evaluation.overallSummary }}</p><label class="field-label" for="feedback-text">Select and copy manually if needed</label><textarea id="feedback-text" class="text-field copy-box" readonly>{{ evaluation.formattedCopyableText }}</textarea><div class="summary-actions"><button type="button" class="primary-button" (click)="interview.copyFeedback()"><app-ui-icon name="copy" /> Copy feedback</button><button type="button" class="secondary-button" (click)="interview.clear()">Finish and clear this device</button></div></section>
+        </div>
+      }
+    }
+  </main>
+  <footer class="site-footer">Year 7 Mock Interview · Sunmarke School</footer>
+</div>

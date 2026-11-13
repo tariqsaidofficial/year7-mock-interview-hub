@@ -1,0 +1,8 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-year7mockintervi-517eee21-386a-46c2-8efc-58bdd46394a2",
+      "rules": "firestore.rules"
+    }
+  ]
+}
