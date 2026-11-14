@@ -1,6 +1,6 @@
 # Year 7 Mock Interview Hub
 
-**Production source candidate; classroom activation remains blocked.** Nova-3 is the owner-approved default speech engine. Hosted keyless Firebase identity, eligible hosting, school retention approval and funded, verified OpenRouter evaluation remain release gates. See [current release status](docs/PRODUCTION_SOURCE_RELEASE_2026-11-13.md).
+**Public source release; classroom activation remains blocked.** Nova-3 is the owner-approved default speech engine. Hosted keyless Firebase identity, eligible hosting, school retention approval and funded, verified OpenRouter evaluation remain release gates. See [current public-release status](docs/PUBLIC_SOURCE_RELEASE_2026-11-14.md).
 
 Angular 21 browser app with ten fixed questions, approved MP3 question audio, Nova-3 speech recognition with a typing fallback, an eight-minute guide timer, local draft recovery, OpenRouter feedback and a protected teacher record view. Students do not create accounts. Firebase Authentication is not used.
 
