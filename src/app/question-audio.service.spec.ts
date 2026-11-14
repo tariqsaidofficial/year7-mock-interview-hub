@@ -53,4 +53,14 @@ describe('static question audio', () => {
     expect(await service.play(1)).toBe(false);
     expect(service.state()).toBe('unavailable');
   });
+
+  it('resets stale playback status when a student clears the session', async () => {
+    vi.stubGlobal('Audio', FakeAudio);
+    const service = new QuestionAudioService();
+    await service.play(1);
+    expect(service.message()).toBe('Playing question audio.');
+    service.reset();
+    expect(service.state()).toBe('idle');
+    expect(service.message()).toBe('You can test question audio or read the question on screen.');
+  });
 });

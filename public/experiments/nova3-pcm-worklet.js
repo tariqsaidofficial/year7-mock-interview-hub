@@ -4,6 +4,8 @@ class Nova3PcmProcessor extends AudioWorkletProcessor {
     super();
     this.samples = new Int16Array(2048);
     this.count = 0;
+    this.levelSum = 0;
+    this.levelCount = 0;
     this.port.onmessage = (event) => {
       if (event.data?.type !== 'flush') return;
       this.flush();
@@ -25,6 +27,13 @@ class Nova3PcmProcessor extends AudioWorkletProcessor {
       let sample = 0;
       for (const channel of channels) sample += channel[i] || 0;
       sample = Math.max(-1, Math.min(1, sample / channels.length));
+      this.levelSum += sample * sample;
+      this.levelCount++;
+      if (this.levelCount >= 2048) {
+        this.port.postMessage({ type: 'level', value: Math.sqrt(this.levelSum / this.levelCount) });
+        this.levelSum = 0;
+        this.levelCount = 0;
+      }
       this.samples[this.count++] = sample < 0 ? sample * 32768 : sample * 32767;
       if (this.count === this.samples.length) this.flush();
     }

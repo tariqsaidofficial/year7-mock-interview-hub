@@ -8,6 +8,15 @@
         "value": "plus jakarta sans",
         "createdAt": "2026-11-12T16:44:11.335Z",
         "reason": "Existing project font loaded in src/index.html before this feedback task; the current brief requires preserving the restored Sunmarke visual identity."
+      },
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "src/styles.css"
+        ],
+        "createdAt": "2026-11-14T17:39:53.326Z",
+        "reason": "Codex reviewed line 22: no thick accent border exists; owner requested exact V5 styling"
       }
     ]
   }

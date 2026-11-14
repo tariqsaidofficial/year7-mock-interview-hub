@@ -1,0 +1,68 @@
+/* Student journey refinements. Scoped so the teacher area and Speech Lab keep their own layouts. */
+.student-experience .main-content{max-width:1100px;padding:38px 24px 64px}
+.student-experience .page-stack{gap:22px}
+.student-experience .surface-card{border-color:#dbe4ef;box-shadow:0 12px 32px #0f172a0a}
+.student-experience .welcome-card{padding:clamp(28px,4vw,46px)}
+.student-experience .hero-title{max-width:760px;font-size:clamp(34px,4.4vw,54px);line-height:1.12}
+.student-experience .hero-lead{max-width:720px;font-size:clamp(16px,1.5vw,18px);line-height:1.7}
+.student-experience .welcome-note{max-width:830px;gap:12px;padding:16px 18px;font-size:15px;line-height:1.6}
+.student-experience .welcome-note app-ui-icon{margin-top:2px}
+.student-experience .category-grid{gap:14px;margin-top:30px}
+.student-experience .category-preview{min-height:174px;padding:18px;background:#fbfcff}
+.student-experience .category-preview h2{margin:18px 0 6px;font-size:15px;line-height:1.4}
+.student-experience .category-preview p{font-size:14px;line-height:1.55}
+.student-experience .preview-number{color:#64748b}
+.student-experience .welcome-action{min-height:52px;margin-top:30px;padding-inline:25px;font-size:15px}
+.student-experience .welcome-availability{display:flex;align-items:flex-start;gap:9px;margin:16px 0 0;padding:13px 15px;border:1px solid #bfdbfe;border-radius:11px;background:#eff6ff;color:#1e3a8a;font-size:14px;line-height:1.5}
+.student-experience .welcome-availability app-ui-icon{flex:none;margin-top:2px}
+.student-experience .form-card,.student-experience .readiness-card{padding:clamp(22px,3vw,32px)}
+.student-experience .section-heading{margin-bottom:24px}
+.student-experience .section-heading h1,.student-experience .section-heading h2{font-size:clamp(24px,2.8vw,32px)}
+.student-experience .section-heading .muted{max-width:640px;font-size:15px;line-height:1.6}
+.student-experience .field-label{font-size:14px}
+.student-experience .text-field{min-height:50px;font-size:16px}
+.student-experience select.text-field{height:50px}
+.student-experience .text-field[aria-invalid="true"]{border-color:#b91c1c}
+.student-experience .privacy-note{display:flex;font-size:14px;line-height:1.6}
+.student-experience .readiness-actions{gap:12px;margin-bottom:16px}
+.student-experience .readiness-device{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px;margin:8px 0 12px}
+.student-experience .readiness-device .secondary-button{min-height:50px}
+.student-experience .readiness-card .audio-status{min-height:24px;align-items:flex-start}
+.student-experience .readiness-card .muted{line-height:1.6}
+.student-experience .setup-actions{gap:12px;padding:2px 0}
+.student-experience .setup-actions .primary-button{min-height:50px}
+.student-experience .resume-card,.student-experience .status-card{margin:clamp(16px,4vh,42px) auto;padding:clamp(24px,4vw,36px)}
+.student-experience .interview-stack{gap:16px}
+.student-experience .interview-context{padding:20px 22px}
+.student-experience .context-topic strong{font-size:16px}
+.student-experience .time-guide{min-height:44px}
+.student-experience .progress-card{padding:16px 22px}
+.student-experience .progress-labels{font-size:13px}
+.student-experience .progress-segments span{height:10px}
+.student-experience .gentle-reminder{font-size:14px;line-height:1.6}
+.student-experience .question-card{padding:clamp(22px,3vw,34px)}
+.student-experience .question-top h1{max-width:760px;font-size:clamp(24px,3vw,34px);line-height:1.3}
+.student-experience .replay-button{min-height:48px;font-size:14px}
+.student-experience .question-card>.audio-status{display:flex;align-items:flex-start;max-width:720px;font-size:14px;line-height:1.55}
+.student-experience .hint-content{font-size:15px;line-height:1.6}
+.student-experience .response-studio{gap:18px;padding:18px;margin:26px 0 22px}
+.student-experience .studio-main{min-width:0}
+.student-experience .studio-main strong{font-size:16px}
+.student-experience .studio-main p{font-size:14px;line-height:1.55}
+.student-experience .speech-status{max-width:260px;white-space:normal;line-height:1.4}
+.student-experience .answer-label{font-size:13px}
+.student-experience .answer-field textarea{min-height:190px;line-height:1.65}
+.student-experience .question-actions{gap:14px;padding-top:24px;margin-top:24px}
+.student-experience .question-actions .primary-button,.student-experience .question-actions .secondary-button{min-height:48px}
+.student-experience .text-link{min-height:44px;justify-self:start;text-underline-offset:3px}
+.student-experience .results-hero{padding:clamp(24px,3vw,36px)}
+.student-experience .feedback-card{padding:18px}
+.student-experience .feedback-card h3{font-size:16px}
+.student-experience .feedback-card p{font-size:14px;line-height:1.6}
+.student-experience .indicator{font-size:12px;line-height:1.3}
+.student-experience .strength-grid .surface-card p,.student-experience .summary-card>p{line-height:1.7}
+.student-experience .snapshot-topic strong,.student-experience .snapshot-topic small{font-size:13px}
+.student-experience button,.student-experience summary{touch-action:manipulation}
+@media(max-width:850px){.student-experience .main-content{padding-top:28px}.student-experience .category-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.student-experience .category-preview{min-height:150px}}
+@media(max-width:650px){.student-experience .main-content{padding:20px 14px 40px}.student-experience .page-stack{gap:16px}.student-experience .welcome-card,.student-experience .question-card{padding:22px}.student-experience .hero-title{font-size:clamp(31px,8vw,40px)}.student-experience .hero-lead{font-size:16px}.student-experience .welcome-note{font-size:14px}.student-experience .category-grid{gap:10px;margin-top:22px}.student-experience .category-preview{min-height:0;padding:15px}.student-experience .readiness-device{grid-template-columns:1fr}.student-experience .readiness-device .secondary-button{justify-self:start}.student-experience .interview-context{padding:17px}.student-experience .progress-card{padding:15px 17px}.student-experience .question-top{gap:16px}.student-experience .question-top h1{font-size:clamp(23px,6vw,28px)}.student-experience .response-studio{align-items:stretch;gap:14px;padding:15px}.student-experience .speech-status{align-self:flex-start;max-width:100%}.student-experience .results-hero{padding:22px}}
+@media(max-width:420px){.student-experience .wordmark span:not(.wordmark-icon){display:none}.student-experience .category-grid{grid-template-columns:1fr}.student-experience .category-preview{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:13px;align-items:start}.student-experience .category-preview .preview-icon{grid-row:1 / 3}.student-experience .category-preview h2{margin:0;font-size:15px}.student-experience .category-preview p{grid-column:2;margin-top:4px}.student-experience .preview-number{display:none}.student-experience .welcome-action,.student-experience .readiness-actions>*{width:100%}.student-experience .setup-actions{flex-direction:column-reverse;align-items:stretch}.student-experience .question-actions{flex-direction:column}.student-experience .question-actions>*{width:100%}.student-experience .question-actions-right{width:100%}.student-experience .question-actions-right>*{width:100%}.student-experience .feedback-grid{grid-template-columns:1fr}}

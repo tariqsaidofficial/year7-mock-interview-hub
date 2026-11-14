@@ -12,6 +12,7 @@ export class Nova3SpeechService {
   readonly recognitionAvailable = signal(typeof window !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && !!window.AudioContext && !!window.AudioWorkletNode && !!window.WebSocket && window.isSecureContext);
   readonly confirmed = signal('');
   readonly provisional = signal('');
+  readonly audioLevel = signal(0);
   readonly firstFinalLatencyMs = signal<number | null>(null);
   readonly firstInterimLatencyMs = signal<number | null>(null);
   readonly connectionReadyMs = signal<number | null>(null);
@@ -146,9 +147,10 @@ export class Nova3SpeechService {
         const mute = this.context.createGain(); mute.gain.value = 0;
         source.connect(worklet); worklet.connect(mute); mute.connect(this.context.destination);
         this.source = source; this.mute = mute;
-        worklet.port.onmessage = (event: MessageEvent<ArrayBuffer | { type: string; id: number }>) => {
+        worklet.port.onmessage = (event: MessageEvent<ArrayBuffer | { type: string; id?: number; value?: number }>) => {
           if (generation !== this.generation) return;
           if (!(event.data instanceof ArrayBuffer)) {
+            if (event.data?.type === 'level') this.audioLevel.set(Math.min(1, (event.data.value || 0) * 8));
             if (event.data?.type === 'flushed' && event.data.id === generation) this.flushResolve?.();
             return;
           }
@@ -195,6 +197,7 @@ export class Nova3SpeechService {
     if (!this.running || this.stopping) return;
     const generation = this.generation;
     this.stopping = true; this.status.set('Finalising speech…');
+    this.audioLevel.set(0);
     this.stream?.getTracks().forEach((track) => track.stop());
     const socket = this.socket;
     let timedOut = false;
@@ -237,6 +240,7 @@ export class Nova3SpeechService {
     if (generation !== this.generation) return;
     this.generation++;
     this.running = false; this.stopping = false; this.flushResolve?.(); this.flushResolve = null; this.closeResolve?.(); this.closeResolve = null;
+    this.audioLevel.set(0);
     this.clearTrialWatchdog();
     if (this.connectedAt) this.connectionDurationMs.set(Date.now() - this.connectedAt);
     this.disconnectAudioGraph();
@@ -248,6 +252,7 @@ export class Nova3SpeechService {
   // Use when the question/context changes: in-flight callbacks are invalidated immediately.
   cancelRecognition() {
     this.generation++; this.callback = null; this.running = false; this.stopping = false;
+    this.audioLevel.set(0);
     this.flushResolve?.(); this.flushResolve = null; this.closeResolve?.(); this.closeResolve = null;
     this.clearTrialWatchdog();
     this.disconnectAudioGraph();

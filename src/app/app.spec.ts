@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { describe, expect, it, vi } from 'vitest';
 import { App } from './app';
 import { SpeechService } from './speech.service';
@@ -7,14 +8,14 @@ import { QuestionAudioService } from './question-audio.service';
 
 describe('student screen', () => {
   function setup() {
-    TestBed.configureTestingModule({ imports: [App], providers: [{ provide: SpeechService, useValue: { status: () => 'Browser fallback unused', recognitionAvailable: () => false, isListening: () => false, stopRecognition: vi.fn() } }, { provide: Nova3SpeechService, useValue: { status: () => 'Stopped', recognitionAvailable: () => false, isListening: () => false, stopRecognition: vi.fn(), cancelRecognition: vi.fn(), provisional: () => '', confirmed: () => '' } }, { provide: QuestionAudioService, useValue: { message: () => 'Audio unavailable', state: () => 'unavailable', enterQuestion: vi.fn(), stop: vi.fn(), reset: vi.fn() } }] });
+    TestBed.configureTestingModule({ imports: [App], providers: [{ provide: SpeechService, useValue: { status: () => 'Browser fallback unused', recognitionAvailable: () => false, isListening: () => false, stopRecognition: vi.fn() } }, { provide: Nova3SpeechService, useValue: { status: () => 'Stopped', recognitionAvailable: () => false, isListening: () => false, stopRecognition: vi.fn(), cancelRecognition: vi.fn(), provisional: signal(''), confirmed: signal('') } }, { provide: QuestionAudioService, useValue: { message: () => 'Audio unavailable', state: () => 'unavailable', enterQuestion: vi.fn(), stop: vi.fn(), reset: vi.fn() } }] });
     return TestBed.createComponent(App);
   }
   it('shows the fixed interview welcome screen and setup action', async () => {
     const fixture = setup();
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Your Year 7 mock interview');
-    expect(fixture.nativeElement.textContent).toContain('Get started');
+    expect(fixture.nativeElement.textContent).toContain('Your voice.');
+    expect(fixture.nativeElement.textContent).toContain("I'm ready to begin");
   });
 
   it('uses Nova-3 for the normal interview without a query flag', () => {
@@ -71,12 +72,11 @@ describe('student screen', () => {
     interview.stage.set('results');
     fixture.detectChanges();
     const root = fixture.nativeElement as HTMLElement;
-    expect(root.querySelectorAll('.feedback-card')).toHaveLength(4);
-    expect(root.querySelectorAll('.snapshot-topic')).toHaveLength(4);
-    expect(Array.from(root.querySelectorAll('.snapshot-topic small')).map((item) => item.textContent)).toEqual(['Some evidence', 'Strong evidence', 'Not enough evidence', 'Some evidence']);
-    expect(root.textContent).toContain('Strengths from your answers');
-    expect(root.textContent).toContain('One small next step');
-    expect(root.querySelector('.results-hero button')?.textContent).toContain('Copy feedback');
+    expect(root.querySelectorAll('.report-card')).toHaveLength(4);
+    expect(Array.from(root.querySelectorAll('.report-indicator')).map((item) => item.textContent)).toEqual(['Some evidence', 'Strong evidence', 'Not enough evidence', 'Some evidence']);
+    expect(root.textContent).toContain('You explained a routine.');
+    expect(root.textContent).toContain('A small next step');
+    expect(root.querySelector('.summary-actions .primary-button')?.textContent).toContain('Copy feedback');
     expect(root.textContent).not.toMatch(/\b\d+%/);
   });
 
@@ -87,7 +87,46 @@ describe('student screen', () => {
     const root = fixture.nativeElement as HTMLElement;
     expect(root.textContent).toContain('Not enough evidence yet to highlight a specific strength.');
     expect(root.querySelectorAll('.strength-list li')).toHaveLength(0);
-    expect(root.querySelector('.snapshot-facts')?.textContent).toContain('0strengths supported by answers');
+    expect(root.querySelectorAll('.report-card')).toHaveLength(4);
+    expect(root.querySelectorAll('.report-indicator')).toHaveLength(4);
     expect(root.querySelectorAll('.summary-actions .primary-button')).toHaveLength(1);
+  });
+
+  it('clears in-memory student details after finishing', () => {
+    const fixture = setup(); const app = fixture.componentInstance;
+    app.form.setValue({ name: 'Test Student', group: '7A' });
+    app.interview.name.set('Test Student');
+    app.interview.group.set('7A');
+    app.interview.stage.set('results');
+    app.finishAndClear();
+    expect(app.interview.stage()).toBe('welcome');
+    expect(app.form.value).toEqual({ name: '', group: '' });
+    expect(app.interview.name()).toBe('');
+    expect(app.interview.group()).toBe('');
+    expect(app.audio.reset).toHaveBeenCalled();
+  });
+
+  it('closes a microphone permission result that arrives after sound check stops', async () => {
+    const fixture = setup(); const app = fixture.componentInstance;
+    const originalDevices = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices');
+    const originalContext = window.AudioContext;
+    let grant!: (stream: MediaStream) => void;
+    const getUserMedia = vi.fn(() => new Promise<MediaStream>((resolve) => { grant = resolve; }));
+    const stop = vi.fn();
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } });
+    Object.defineProperty(window, 'AudioContext', { configurable: true, value: class {} });
+    try {
+      app.interview.stage.set('sound-check');
+      const pending = app.startSoundCheck();
+      app.stopSoundCheck();
+      grant({ getTracks: () => [{ stop }] } as unknown as MediaStream);
+      await pending;
+      expect(stop).toHaveBeenCalledOnce();
+      expect(app.soundCheckActive()).toBe(false);
+    } finally {
+      if (originalDevices) Object.defineProperty(navigator, 'mediaDevices', originalDevices);
+      else Reflect.deleteProperty(navigator, 'mediaDevices');
+      Object.defineProperty(window, 'AudioContext', { configurable: true, value: originalContext });
+    }
   });
 });

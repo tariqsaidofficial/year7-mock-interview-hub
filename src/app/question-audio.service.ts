@@ -2,6 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { QUESTIONS } from './interview.models';
 
 export type AudioState = 'idle' | 'loading' | 'playing' | 'tap-to-play' | 'unavailable';
+const INITIAL_AUDIO_MESSAGE = 'You can test question audio or read the question on screen.';
 
 export function questionAudioPath(questionId: number): string {
   if (!Number.isInteger(questionId) || questionId < 1 || questionId > QUESTIONS.length) throw new RangeError('Unknown question');
@@ -11,7 +12,7 @@ export function questionAudioPath(questionId: number): string {
 @Injectable({ providedIn: 'root' })
 export class QuestionAudioService {
   readonly state = signal<AudioState>('idle');
-  readonly message = signal('Question audio will be available after the approved files are added. You can read the question on screen.');
+  readonly message = signal(INITIAL_AUDIO_MESSAGE);
   private current: HTMLAudioElement | null = null;
   private generation = 0;
   private visited = new Set<number>();
@@ -89,5 +90,6 @@ export class QuestionAudioService {
   reset() {
     this.stop();
     this.visited.clear();
+    this.message.set(INITIAL_AUDIO_MESSAGE);
   }
 }

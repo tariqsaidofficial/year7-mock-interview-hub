@@ -5,7 +5,7 @@ import { clearResult, loadResult, saveResult } from './result-store';
 import { guestCsrf } from './session';
 import { Nova3SpeechService } from './experiments/nova3-speech.service';
 import { QuestionAudioService } from './question-audio.service';
-export type Stage = 'welcome' | 'setup' | 'resume-draft' | 'interview' | 'evaluating' | 'offline-pending' | 'evaluation-error' | 'results';
+export type Stage = 'welcome' | 'setup' | 'sound-check' | 'resume-draft' | 'interview' | 'evaluating' | 'offline-pending' | 'evaluation-error' | 'results';
 const RECOMMENDED_SECONDS = 8 * 60;
 export const STUDENT_CSRF = new InjectionToken<() => Promise<string>>('guest session csrf', { providedIn: 'root', factory: () => guestCsrf });
 @Injectable({ providedIn: 'root' })
@@ -50,7 +50,7 @@ export class InterviewService {
   }
   showSetup() { this.stage.set('setup'); }
   start(name: string, group: string) {
-    if (this.stage() !== 'setup') return;
+    if (this.stage() !== 'sound-check') return;
     clearResult(); this.resultSaved.set(true);
     this.name.set(name.trim()); this.group.set(group.trim());
     this.id = crypto.randomUUID(); this.startedAt.set(Date.now()); this.elapsedSeconds.set(0);

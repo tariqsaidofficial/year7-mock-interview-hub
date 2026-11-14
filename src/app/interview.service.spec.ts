@@ -8,7 +8,23 @@ import { QUESTIONS } from './interview.models';
 import { loadResult, saveResult } from './result-store';
 
 describe('supportive interview timing', () => {
-  beforeEach(() => { localStorage.clear(); sessionStorage.clear(); TestBed.resetTestingModule(); vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-12T08:00:00Z')); });
+  beforeEach(() => {
+    // Node may expose an undefined global localStorage unless --localstorage-file is set.
+    // Keep this suite independent of that runtime option.
+    if (!globalThis.localStorage) {
+      const entries = new Map<string, string>();
+      vi.stubGlobal('localStorage', {
+        getItem: (key: string) => entries.get(key) ?? null,
+        setItem: (key: string, value: string) => { entries.set(key, String(value)); },
+        removeItem: (key: string) => { entries.delete(key); },
+        clear: () => { entries.clear(); },
+        key: (index: number) => [...entries.keys()][index] ?? null,
+        get length() { return entries.size; },
+      } satisfies Storage);
+    }
+    localStorage.clear(); sessionStorage.clear(); TestBed.resetTestingModule();
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-12T08:00:00Z'));
+  });
   afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
   function service() {
@@ -20,7 +36,7 @@ describe('supportive interview timing', () => {
 
   it('counts down gently and does not submit, lock typing or interrupt audio after eight minutes', () => {
     const { interview, audio, speech } = service();
-    interview.showSetup(); interview.start('Example Student', '7A');
+    interview.showSetup(); interview.stage.set('sound-check'); interview.start('Example Student', '7A');
     const startedAt = interview.startedAt();
     expect(interview.timeText()).toBe('08:00');
     expect(interview.nearGuide()).toBe(false);
@@ -49,7 +65,7 @@ describe('supportive interview timing', () => {
   it('finishes only when Finish Interview is selected on question ten', () => {
     const { interview } = service();
     const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
-    interview.showSetup(); interview.start('Example Student', '7A');
+    interview.showSetup(); interview.stage.set('sound-check'); interview.start('Example Student', '7A');
     interview.index.set(9);
     interview.next();
     expect(interview.stage()).toBe('offline-pending');
@@ -58,7 +74,7 @@ describe('supportive interview timing', () => {
 
   it('stops the primary Nova-3 microphone when connectivity is interrupted', () => {
     const { interview, speech } = service();
-    interview.showSetup(); interview.start('Example Student', '7A');
+    interview.showSetup(); interview.stage.set('sound-check'); interview.start('Example Student', '7A');
     window.dispatchEvent(new Event('offline'));
     expect(speech.stopRecognition).toHaveBeenCalled();
     expect(interview.online()).toBe(false);
@@ -82,7 +98,7 @@ describe('supportive interview timing', () => {
   it('keeps validated feedback through refresh and clears it only on explicit finish', async () => {
     const evaluation = { categories: ['transition', 'subjects', 'activities', 'leadership'].map((categoryId) => ({ categoryId, indicator: 'Not enough evidence', evidence: 'No relevant answer.', nextStep: 'Share an example.' })), whatWentWell: [], evenBetterIf: 'Try an example.', overallSummary: 'There is not enough evidence yet.', formattedCopyableText: 'Exact feedback text.' };
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ evaluation }), { status: 200, headers: { 'Content-Type': 'application/json' } })));
-    const { interview } = service(); interview.showSetup(); interview.start('Example Student', '7A'); interview.updateAnswer('My answer.');
+    const { interview } = service(); interview.showSetup(); interview.stage.set('sound-check'); interview.start('Example Student', '7A'); interview.updateAnswer('My answer.');
     await interview.submit();
     expect(interview.stage()).toBe('results');
     const runId = JSON.parse(localStorage.getItem('year7-interview-draft-v1') || '{}').id as string;
@@ -102,7 +118,7 @@ describe('supportive interview timing', () => {
 
   it('reports HTML API responses plainly and preserves answers for retry', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<!doctype html><title>Not Found</title>', { status: 404, headers: { 'Content-Type': 'text/html' } })));
-    const { interview } = service(); interview.showSetup(); interview.start('Example Student', '7A'); interview.updateAnswer('My exact answer.');
+    const { interview } = service(); interview.showSetup(); interview.stage.set('sound-check'); interview.start('Example Student', '7A'); interview.updateAnswer('My exact answer.');
     await interview.submit();
     expect(interview.stage()).toBe('evaluation-error');
     expect(interview.message()).toContain('unexpected page');
@@ -115,7 +131,7 @@ describe('supportive interview timing', () => {
   it('leaves the loading screen if the evaluation request hangs', async () => {
     const pending = vi.fn(() => new Promise<Response>((resolve) => { void resolve; }));
     vi.stubGlobal('fetch', pending);
-    const { interview } = service(); interview.showSetup(); interview.start('Example Student', '7A'); interview.updateAnswer('My exact answer.');
+    const { interview } = service(); interview.showSetup(); interview.stage.set('sound-check'); interview.start('Example Student', '7A'); interview.updateAnswer('My exact answer.');
     const submission = interview.submit();
     await vi.advanceTimersByTimeAsync(70_000);
     await submission;

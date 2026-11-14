@@ -3,7 +3,7 @@ import {
   LucideActivity, LucideArrowLeft, LucideArrowLeftRight, LucideArrowRight,
   LucideBookOpen, LucideClock3, LucideCopy, LucideDynamicIcon,
   LucideHeadphones, LucideHouse, LucideInfo, LucideLightbulb,
-  LucideList, LucideMic, LucideRefreshCw, LucideRotateCcw,
+  LucideList, LucideMessageCircle, LucideMic, LucideRefreshCw, LucideRotateCcw,
   LucideShield, LucideShieldCheck, LucideSparkles, LucideSquare,
   LucideUserRound, LucideVolume2,
 } from '@lucide/angular';
@@ -30,6 +30,7 @@ const ICONS = {
   info: LucideInfo.icon,
   user: LucideUserRound.icon,
   refresh: LucideRefreshCw.icon,
+  message: LucideMessageCircle.icon,
 } as const;
 
 export type IconName = keyof typeof ICONS;

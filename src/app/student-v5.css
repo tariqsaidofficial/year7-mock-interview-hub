@@ -1,0 +1,195 @@
+/* Reference-aligned V5 layouts from supplied preview and theme sheet. */
+.student-experience{font-family:'Avenir Next','Trebuchet MS',system-ui,-apple-system,BlinkMacSystemFont,sans-serif;background:linear-gradient(180deg,#f7faff 0%,#f2f6fd 62%,#f8fbff 100%);font-size:15px;font-weight:500;line-height:1.55;color:#142344}
+.student-experience h1,.student-experience h2,.student-experience h3{font-weight:850}
+.student-experience .eyebrow{font-weight:900;letter-spacing:1.5px}
+.student-experience .site-header{position:sticky;top:0;z-index:20;border-bottom:2px solid #f4f7fc;box-shadow:0 2px 16px #1b2e5410}
+.student-experience .header-actions{gap:8px}
+.student-experience .header-chip{display:inline-flex;align-items:center;gap:8px;min-height:37px;padding:7px 12px;border:1px solid #dfe7f3;border-radius:999px;background:#fff;color:#506080;font-size:12px;font-weight:800;white-space:nowrap}
+.student-experience .header-chip .status-dot{display:block;width:8px;height:8px;background:#52b790;border-radius:50%}
+.student-experience .teacher-footer-link{display:inline-flex;align-items:center;min-height:44px;margin-left:18px;padding:0 8px;border:0;background:none;color:#546990;text-decoration:underline;font-size:11px;cursor:pointer}
+.student-experience .teacher-footer-link:focus-visible{outline:3px solid #2caff9;outline-offset:3px}
+.student-experience .header-inner{max-width:1180px;min-height:78px;padding:8px 28px}
+.student-experience .school-logo{width:58px;height:62px}
+.student-experience .wordmark strong{font-size:16px;letter-spacing:-.35px}
+.student-experience .wordmark span{font-size:12px}
+.student-experience .main-content{max-width:1180px;padding:32px 28px 70px}
+.student-experience .site-footer{font-size:11px;color:#5b6b83}
+.student-experience .welcome-v5{gap:0}
+.student-experience .topics-heading{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:32px 0 17px}
+.student-experience .topics-heading h2{font-size:22px;line-height:1.2;letter-spacing:-.7px;margin:0;color:#14244d}
+.student-experience .topics-heading p{color:#5c6c87;font-size:13px;margin:0}
+.student-experience .experience-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.student-experience .experience-card{position:relative;min-width:0;min-height:146px;padding:17px 17px 18px;border:1px solid #dfe8f5;border-radius:19px;background:#fff;box-shadow:0 5px 16px #1b316009;overflow:hidden;transition:transform .18s,border-color .18s,box-shadow .18s}
+.student-experience .experience-card:hover{transform:translateY(-4px);border-color:#8fb7df;box-shadow:0 12px 24px #162f6c12}
+.student-experience .experience-card:before{content:'';position:absolute;top:0;left:0;right:0;height:5px;background:#b7cee9}
+.student-experience .experience-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.student-experience .experience-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:#edf4ff;color:#29488a;font-size:23px;font-weight:900;line-height:1}
+.student-experience .experience-card .preview-number{color:#64748b;font-size:11px;font-weight:800}
+.student-experience .experience-card:nth-child(even) .experience-icon{background:#e8f7fc;color:#146e93}
+.student-experience .experience-card h3{font-size:15px;margin:0 0 6px;line-height:1.33;letter-spacing:-.25px;color:#14244d}
+.student-experience .experience-card p{font-size:12px;color:#5c6c87}
+.student-experience .welcome-hero{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);min-height:386px;margin-top:20px;padding:0;border:1px solid #dfe8f5;border-radius:30px;background:#fff;box-shadow:0 22px 58px #1a2a5914;overflow:hidden}
+.student-experience .welcome-copy{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:clamp(26px,3vw,42px)}
+.student-experience .welcome-copy .eyebrow{font-size:11px;margin:0;color:#304dab}
+.student-experience .hero-title{display:block;font-size:clamp(33px,3.35vw,48px);line-height:1.13;letter-spacing:-.045em;margin:12px 0 0;max-width:100%;text-wrap:balance;color:#14244d}
+.student-experience .hero-title span{display:block;color:#14244d!important}
+.student-experience .hero-color-stroke,.student-experience .reflection-hero-accent{display:block;width:142px;height:5px;border-radius:999px;margin:19px 0 18px;background:linear-gradient(90deg,#2b4b98 0 76%,#19a8d5 76% 100%)}
+.student-experience .hero-lead{margin:0;max-width:43ch;font-size:clamp(14px,1.1vw,16px);line-height:1.62;color:#566883}
+.student-experience .hero-foot{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin:18px 0 21px}
+.student-experience .hero-foot span{background:#edf5ff;border:1px solid #d8e7fa;border-radius:999px;padding:5px 11px;color:#2b4b84;font-size:12px;font-weight:800}
+.student-experience .hero-foot strong{font-weight:900}
+.student-experience .welcome-action{margin:0;min-height:52px;border-radius:12px;font-size:15px;box-shadow:0 9px 18px #1c34712a}
+.student-experience .hero-cta:hover{background:#c91b77;border-color:#c91b77;box-shadow:0 4px 0 #ffe92b}
+.student-experience .hero-cta:focus-visible{outline:4px solid #ffe92b;outline-offset:3px}
+.student-experience .welcome-art{position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;background:radial-gradient(circle at 78% 25%,#3966ad 0,transparent 38%),linear-gradient(135deg,#182e66,#1d3174 62%,#101d4b);padding:0}
+.student-experience .welcome-art:after{content:'';position:absolute;width:410px;height:410px;top:-96px;left:-78px;border-radius:50%;border:19px solid #ffffff1e;box-shadow:0 0 0 38px #17afe014,0 0 0 72px #ffdd3110;pointer-events:none}
+.student-experience .circle-corner{position:absolute;border:1px solid #ffffff25;border-radius:50%;width:430px;height:430px;top:90px;left:65px}
+.student-experience .circle-corner.two{width:340px;height:340px;top:135px;left:110px}
+.student-experience .hero-speech{position:relative;width:270px;height:210px;z-index:1}
+.student-experience .speech{position:absolute;border-radius:26px 26px 26px 9px;box-shadow:0 13px 35px #0c1d473e}
+.student-experience .speech.one{width:210px;height:133px;left:0;top:24px;background:#fff;transform:rotate(-8deg)}
+.student-experience .speech.one:after{content:'';position:absolute;left:24px;top:40px;width:158px;height:50px;border-radius:15px;background:repeating-linear-gradient(90deg,#59b7e2 0 10px,#fff 10px 19px);opacity:.55}
+.student-experience .speech.two{width:153px;height:91px;right:-10px;bottom:0;background:#ffd944;transform:rotate(9deg)}
+.student-experience .speech.two:after{content:'✦  ✧  ✦';position:absolute;top:25px;left:26px;color:#172c65;font-size:27px;letter-spacing:4px}
+.student-experience .hero-orb{position:absolute;border-radius:50%;background:#f47fb7;width:20px;height:20px;left:5px;bottom:22px}
+.student-experience .hero-orb.cyan{background:#47cbe4;width:13px;height:13px;left:auto;right:0;top:0}
+.student-experience .setup-v5,.student-experience .sound-check-v5{max-width:990px;margin:auto;gap:0}
+.student-experience .setup-heading{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:5px 0 24px;padding:0}
+.student-experience .setup-heading .eyebrow{font-size:11px;margin:0;color:#304dab}
+.student-experience .setup-heading h1{font-size:36px;letter-spacing:-1.5px;line-height:1.2;margin:5px 0;font-weight:850}
+.student-experience .step-dots{display:flex;align-items:center;gap:8px}
+.student-experience .step-dots span{width:32px;height:7px;border-radius:999px;background:#e1e7f2}
+.student-experience .step-dots .active{background:#2f58bc}
+.student-experience .step-dots .done{background:#3db6ad}
+.student-experience .setup-layout{display:grid;grid-template-columns:minmax(0,1.07fr) minmax(0,.93fr);gap:18px}
+.student-experience .form-card,.student-experience .readiness-card,.student-experience .setup-aside{padding:28px;border-radius:23px;box-shadow:0 8px 24px #1c33720b}
+.student-experience .form-card .section-heading{margin:0 0 16px}
+.student-experience .form-card .section-heading h2,.student-experience .readiness-card h2{font-size:22px;letter-spacing:-.7px;margin:4px 0 10px}
+.student-experience .form-card .section-heading .muted{font-size:14px;margin:0 0 16px;color:#66778e}
+.student-experience .form-grid{display:block}
+.student-experience .form-grid>div+div{margin-top:17px}
+.student-experience .form-card .text-field{min-height:50px;padding:12px 14px;border-color:#cfdced;background:#fff}
+.student-experience .privacy-note{display:block;background:#f1f5ff;color:#31508f;border-radius:9px;padding:10px 12px;font-size:12px;margin:18px 0 0}
+.student-experience .privacy-note app-ui-icon{display:none}
+.student-experience .setup-aside{background:#edf9fe;border-color:#cce5f4}
+.student-experience .setup-aside .eyebrow{font-size:11px;margin:0;color:#304dab}
+.student-experience .welcome-side-art{display:flex;justify-content:center;align-items:center;gap:24px;min-height:126px}
+.student-experience .welcome-side-art span{display:grid;place-items:center;width:58px;height:58px;border-radius:20px;background:#2b4a91;color:#fff;font-size:28px;font-weight:800;transform:rotate(-10deg)}
+.student-experience .welcome-side-art span:nth-child(2){width:86px;height:86px;border-radius:50%;background:#19a8d5;transform:none;font-size:30px}
+.student-experience .welcome-side-art span:nth-child(3){transform:rotate(10deg)}
+.student-experience .setup-aside h2{font-size:26px;line-height:1.25;margin:5px 0 9px;color:#14244d}
+.student-experience .setup-aside>p:not(.eyebrow){font-size:14px;color:#66778e;margin:0 0 22px;line-height:1.6}
+.student-experience .next-note{background:#eaf1fe;color:#3c5381;padding:10px 12px;font-size:12px;font-weight:700;border-radius:9px}
+.student-experience .setup-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:19px}
+.student-experience .setup-actions .secondary-button{box-shadow:none}
+.student-experience .sound-stage .readiness-card{background:linear-gradient(152deg,#f4f8ff,#fff 68%)}
+.student-experience .sound-stage .readiness-card>p:not(.eyebrow){font-size:14px;line-height:1.6;color:#66778e}
+.student-experience .sound-checklist{display:grid;gap:15px;margin:22px 0}
+.student-experience .sound-checklist>div{display:flex;align-items:flex-start;gap:12px}
+.student-experience .sound-checklist .check-icon{display:grid;place-items:center;flex:none;width:31px;height:31px;border-radius:10px;background:#dcf6ed;color:#16876a;font-size:18px;font-weight:950}
+.student-experience .sound-checklist strong{display:block;color:#14244d;font-size:13px}
+.student-experience .sound-checklist small{display:block;color:#5b6b83;font-size:12px;margin-top:1px}
+.student-experience .sound-test{border:1px solid #e2e8f5;border-radius:15px;background:#fff;padding:17px}
+.student-experience .sound-test>strong{font-size:13px}
+.student-experience .sound-test>p{font-size:12px;margin:4px 0 14px;color:#66778e}
+.student-experience .sound-test .secondary-button{font-size:13px;min-height:44px}
+.student-experience .mic-status{display:flex;align-items:center;gap:9px;margin:13px 0 11px;color:#435678;font-size:12px;font-weight:750}
+.student-experience .status-indicator{display:block;flex:none;width:9px;height:9px;border-radius:50%;background:#a7b3c6}
+.student-experience .sound-result{margin:14px 0 0;padding:10px 12px;border-radius:9px;background:#f1f5ff;color:#31508f;font-size:12px;line-height:1.55;text-align:left}
+.student-experience .sound-orb-card{text-align:center;padding:2px 0 4px;background:radial-gradient(circle at 50% 45%,#f5e6f975,#ebf8ff55 65%,transparent 84%)}
+.student-experience .sound-orb-card strong,.student-experience .sound-orb-card small{display:block}
+.student-experience .sound-orb-card strong{font-size:14px;color:#172958;margin-top:-2px}
+.student-experience .sound-orb-card small{font-size:12px;color:#61728b}
+.student-experience .sound-orb .voice-orb{width:252px;height:252px;margin:auto}
+.student-experience .sound-steps{display:grid;gap:18px;margin:20px 0}
+.student-experience .sound-steps>div{display:flex;align-items:center;gap:11px;font-size:13px;color:#506080}
+.student-experience .sound-steps b{display:grid;place-items:center;min-width:34px;height:34px;border-radius:10px;background:#e8f2ff;color:#294c86}
+.student-experience .privacy-mic{font-size:12px!important;margin:12px 0 0!important}
+.student-experience .interview-v5{max-width:1050px;margin:auto}
+.student-experience .interview-heading{display:flex;justify-content:space-between;align-items:center;gap:15px;margin:0 0 18px}
+.student-experience .interview-heading h1{font-size:24px;letter-spacing:-.5px;margin:3px 0;font-weight:850;line-height:1.2}
+.student-experience .interview-heading .eyebrow{margin:0}
+.student-experience .interview-heading .time-guide{border:1px solid #dde6f3;border-radius:13px;background:#fff;color:#3a5078;padding:10px 15px;min-height:44px;font-weight:850}
+.student-experience .progress-segments{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));margin:0 0 23px;gap:7px}
+.student-experience .progress-segments span{height:10px;background:#e1e7f1}
+.student-experience .progress-segments span.completed{background:#5db9ad}
+.student-experience .progress-segments span.current{background:#1e9ecb;box-shadow:none}
+.student-experience .question-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,.55fr);gap:17px;align-items:start}
+.student-experience .question-card{padding:35px;border-radius:25px;box-shadow:0 22px 58px #1a2a5914}
+.student-experience .question-card .eyebrow{margin:0;color:#395cb6}
+.student-experience .question-card h2{font-size:clamp(25px,2.8vw,34px);letter-spacing:-1.3px;line-height:1.25;margin:20px 0 23px;font-weight:850}
+.student-experience .replay-button{min-height:44px;border:0;background:#edf4ff;color:#2c4d9d;border-radius:12px;font-size:13px;font-weight:800}
+.student-experience .question-card>.audio-status{font-size:12px;margin:8px 0 0;color:#5c6c87}
+.student-experience .record-box{border-radius:19px;border:1px solid #e1e9f3;background:linear-gradient(155deg,#f8fbff,#edf5ff 70%,#f8fbff);text-align:center;padding:24px;margin-top:26px}
+.student-experience .record-box .interview-orb .voice-orb{width:252px;height:252px;margin:0 auto 5px}
+.student-experience .record-box>strong{display:block;font-size:15px;margin:0}
+.student-experience .record-box>small{display:block;font-size:12px;color:#64748f;margin:3px 0 12px}
+.student-experience .record-box .speech-status{display:inline-block;margin:0 0 8px}
+.student-experience .confirmed-panel{border:1px solid #dbe5f4;background:#fff;min-height:70px;border-radius:13px;text-align:left;margin:14px 0 0;padding:13px 15px;font-size:13px;color:#40506b}
+.student-experience .confirmed-panel span{display:block;color:#64748b;font-size:10px;font-weight:900;letter-spacing:.1em}
+.student-experience .confirmed-panel p{margin:6px 0 0;line-height:1.6;white-space:pre-wrap}
+.student-experience .provisional-panel{font-size:12px;color:#5c6c87;text-align:left;margin:9px 0 0}
+.student-experience .answer-field{margin-top:18px;text-align:left}
+.student-experience .answer-field textarea{min-height:115px;line-height:1.55}
+.student-experience .answer-field>span{display:block;text-align:right;font-size:11px;color:#66778e}
+.student-experience .continue-speaking{margin-top:13px}
+.student-experience .interview-tip{min-height:275px;padding:26px;border:1px solid #f3dfad;border-radius:23px;background:#fffdf4}
+.student-experience .interview-tip>app-ui-icon{color:#1d3a75}
+.student-experience .interview-tip h3{font-size:20px;margin:15px 0 8px;font-weight:850;line-height:1.25}
+.student-experience .interview-tip>p{font-size:13px;color:#5c6c87;line-height:1.6}
+.student-experience .side-points{border-top:1px solid #f0deb8;margin-top:19px;padding-top:12px;font-size:12px;color:#3a5078}
+.student-experience .side-points p{margin:8px 0}
+.student-experience .question-actions{border:0;margin:19px 0 0;padding:0;align-items:center}
+.student-experience .question-actions .secondary-button{background:#fff}
+.student-experience .text-link{margin-top:15px}
+.student-experience .feedback-v5{max-width:1050px;margin:auto}
+.student-experience .reflection-intro{display:grid;grid-template-columns:minmax(0,1fr) 184px;align-items:center;gap:26px;min-height:246px;padding:clamp(24px,3.5vw,41px);border:1px solid #dde8f5;border-radius:26px;box-shadow:0 15px 36px #1b31600e;background:linear-gradient(116deg,#fff 4%,#fbfdff 54%,#ecf6ff 100%)}
+.student-experience .reflection-intro .eyebrow{font-size:11px;letter-spacing:1.35px;color:#3155a4}
+.student-experience .reflection-intro h1{font-size:clamp(27px,3vw,39px);line-height:1.14;letter-spacing:-.035em;margin:13px 0 0;max-width:19ch}
+.student-experience .reflection-hero-accent{width:95px;height:4px;margin:19px 0 16px}
+.student-experience .reflection-intro p:not(.eyebrow){font-size:clamp(13px,1.05vw,15px);line-height:1.7;max-width:57ch;margin:0;color:#586b89}
+.student-experience .reflection-note{display:flex;align-items:center;gap:9px;margin-top:19px;font-size:12px;font-weight:760;color:#365b8d}
+.student-experience .reflection-note span{width:9px;height:9px;background:#159bc6;border-radius:50%;box-shadow:0 0 0 4px #e0f4fb}
+.student-experience .reflection-art{position:relative;width:184px;height:184px;display:grid;place-items:center;justify-self:end;color:#2d4d92}
+.student-experience .reflection-art-halo{position:absolute;inset:6px;border:1px solid #d7eafa;border-radius:50%;background:#f4faff}
+.student-experience .reflection-art-icon{position:relative;z-index:1;width:160px;height:160px;max-width:100%}
+.student-experience .reflection-section-head{display:flex;align-items:end;justify-content:space-between;gap:15px;margin:30px 0 17px}
+.student-experience .reflection-section-head h2{font-size:clamp(21px,2.2vw,25px);margin:5px 0 0;letter-spacing:-.025em}
+.student-experience .reflection-section-head .eyebrow{font-size:10px;margin:0}
+.student-experience .reflection-section-head>span{font-size:13px;color:#5c6c87}
+.student-experience .report-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.student-experience .report-card{min-width:0;padding:19px 18px 21px;min-height:174px;border-radius:18px;border:1px solid #dfe8f5;background:#fff;box-shadow:0 7px 22px #162c5f09}
+.student-experience .report-card-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.student-experience .report-icon{display:grid;place-items:center;width:41px;height:41px;border-radius:12px;background:#ebf3ff;color:#274b94;font-weight:900;font-size:23px;line-height:1}
+.student-experience .report-card:nth-child(even) .report-icon{background:#e7f7fc;color:#166f92}
+.student-experience .report-number{font-size:11px;color:#64748b;font-weight:800}
+.student-experience .report-card h3{font-size:15px;margin:0 0 5px;line-height:1.35;color:#14244d}
+.student-experience .report-indicator{font-size:12px;line-height:1.55;font-weight:780;color:#31588e;display:block}
+.student-experience .report-card p{margin:6px 0 0;color:#61728f;font-size:12px;line-height:1.53}
+.student-experience .report-card .report-next{border-top:1px solid #e8eef7;padding-top:8px;margin-top:10px}
+.student-experience .reflection-details{display:grid;grid-template-columns:1.1fr .9fr;gap:17px;margin-top:17px}
+.student-experience .reflection-details .surface-card{min-height:211px;padding:26px 28px;border-radius:21px;box-shadow:0 7px 20px #162c5f06}
+.student-experience .reflection-details .eyebrow{font-size:10px;letter-spacing:1.4px;color:#3459a2}
+.student-experience .reflection-details h2{margin:7px 0 19px;color:#182b59;letter-spacing:-.025em;font-size:21px}
+.student-experience .strength-list{list-style:none;margin:0;padding:0;display:grid;gap:13px}
+.student-experience .strength-list li{display:flex;align-items:flex-start;gap:12px;margin:0;color:#4b5d7a;font-size:13px;line-height:1.54}
+.student-experience .strength-num{background:#edf4ff;color:#31559c;border-radius:9px;padding:5px 7px;min-width:29px;text-align:center;font-size:10px;font-weight:850}
+.student-experience .reflection-details .reflection-next{position:relative;overflow:hidden;background:linear-gradient(135deg,#f4f9ff,#eaf4ff);border:1px solid #d7e5f7}
+.student-experience .reflection-next>p:not(.eyebrow){font-size:13px;color:#4b6081;line-height:1.7;position:relative;z-index:1}
+.student-experience .reflection-next-mark{position:absolute;right:16px;bottom:2px;font-size:92px;font-weight:300;line-height:1;color:#c8ddf4;pointer-events:none}
+.student-experience .summary-card{margin-top:17px;padding:22px}
+.student-experience .summary-card h2{font-size:18px}
+.student-experience .summary-card>p:not(.eyebrow){font-size:14px}
+.student-experience .reflection-actions{margin-top:21px;display:flex;gap:12px;align-items:center}
+.student-experience .reflection-actions .primary-button,.student-experience .reflection-actions .secondary-button{min-height:49px}
+.student-experience .summary-details{margin:16px 0 0;color:#536681;font-size:13px}
+.student-experience .summary-details summary{display:inline-flex;align-items:center;min-height:44px;padding:8px 0;color:#284a8c;font-weight:800;cursor:pointer}
+.student-experience .summary-details[open]{padding:18px;border:1px solid #dfe8f5;border-radius:15px;background:#fff}
+.student-experience .summary-details p{line-height:1.6}
+@media(max-width:990px){.student-experience .experience-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.student-experience .welcome-hero{grid-template-columns:minmax(0,1.13fr) minmax(0,.87fr)}.student-experience .welcome-copy{padding:29px}.student-experience .hero-title{font-size:clamp(32px,3.7vw,42px)}.student-experience .report-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:740px){.student-experience .main-content{padding:18px 16px 46px}.student-experience .topics-heading{display:block}.student-experience .topics-heading p{margin-top:4px}.student-experience .experience-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.student-experience .experience-card{min-height:151px;padding:13px}.student-experience .welcome-hero{display:flex;flex-direction:column;padding:0}.student-experience .welcome-copy{padding:27px 23px 26px}.student-experience .hero-title{font-size:clamp(32px,8.4vw,40px)}.student-experience .hero-color-stroke{width:115px;margin:16px 0}.student-experience .hero-lead{font-size:15px}.student-experience .welcome-art{min-height:155px}.student-experience .setup-layout{grid-template-columns:1fr}.student-experience .step-dots{display:none}.student-experience .question-layout{grid-template-columns:1fr}.student-experience .interview-tip{min-height:0}.student-experience .reflection-intro{grid-template-columns:1fr;min-height:0;padding:25px 23px}.student-experience .reflection-art{display:none}.student-experience .reflection-section-head{align-items:flex-start;flex-direction:column;gap:6px}.student-experience .reflection-details{grid-template-columns:1fr;gap:12px}.student-experience .reflection-details .surface-card{min-height:0;padding:21px}.student-experience .reflection-next-mark{display:none}}
+@media(max-width:390px){.student-experience .hero-title{font-size:39px}.student-experience .experience-card{min-height:163px}.student-experience .experience-card h3{font-size:13px}.student-experience .topics-heading h2{font-size:19px}.student-experience .report-grid{gap:10px}.student-experience .report-card{padding:15px 14px 17px;min-height:157px}.student-experience .reflection-actions{flex-wrap:wrap}.student-experience .reflection-actions>*{width:100%}}
+@media(max-width:360px){.student-experience .hero-title{font-size:clamp(28px,8.5vw,34px)}.student-experience .experience-grid,.student-experience .report-grid{grid-template-columns:1fr}.student-experience .experience-card,.student-experience .report-card{min-height:0}.student-experience .welcome-art{display:block;min-height:150px}.student-experience .reflection-intro{padding:21px 18px}.student-experience .reflection-intro h1{font-size:27px}}
+@media(max-width:700px){.student-experience .header-inner{min-height:74px;padding:8px 16px}.student-experience .school-logo{width:44px;height:48px}.student-experience .wordmark strong{font-size:13px}.student-experience .wordmark span{font-size:10px}.student-experience .header-chip:last-child{display:none}.student-experience .voice-chip{font-size:11px}.student-experience .experience-icon{width:33px;height:33px;font-size:19px}.student-experience .experience-card p{font-size:11px}.student-experience .hero-speech{transform:scale(.55)}}
+@media(max-width:420px){.student-experience .header-inner{padding-inline:12px;gap:6px}.student-experience .school-logo{width:36px;height:42px}.student-experience .wordmark{gap:6px}.student-experience .wordmark strong{font-size:12px}.student-experience .header-actions .quiet-button span{display:none}.student-experience .header-actions .quiet-button{width:44px;height:44px;padding:8px}.student-experience .setup-actions{flex-direction:column-reverse;align-items:stretch}.student-experience .setup-actions>*{width:100%}}
+@media(prefers-reduced-motion:reduce){.student-experience .experience-card{transition:none}.student-experience .experience-card:hover{transform:none}}
