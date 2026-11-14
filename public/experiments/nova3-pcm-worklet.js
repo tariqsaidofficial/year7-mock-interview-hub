@@ -4,7 +4,12 @@ class Nova3PcmProcessor extends AudioWorkletProcessor {
     super();
     this.samples = new Int16Array(2048);
     this.count = 0;
-    this.port.onmessage = (event) => { if (event.data === 'flush') this.flush(); };
+    this.port.onmessage = (event) => {
+      if (event.data?.type !== 'flush') return;
+      this.flush();
+      // Port messages are ordered: the main thread receives any final PCM packet first.
+      this.port.postMessage({ type: 'flushed', id: event.data.id });
+    };
   }
   flush() {
     if (!this.count) return;
