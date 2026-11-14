@@ -42,4 +42,4 @@ npm run build
 npm audit --omit=dev
 ```
 
-For Firestore rules, run the existing emulator test with `FIRESTORE_EMULATOR_HOST` set to a local emulator only. Do not run it against production. Private GitHub publication is source backup and review; it does not deploy or approve classroom use.
+For Firestore rules, run the existing emulator test with `FIRESTORE_EMULATOR_HOST` set to a local emulator only. Do not run it against production. Public GitHub source availability does not deploy or approve classroom use.
