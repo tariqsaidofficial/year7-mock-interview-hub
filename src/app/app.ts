@@ -50,10 +50,10 @@ export class App {
   private recognitionBase = '';
   private speechGeneration = 0;
   constructor() {
-    this.answer.valueChanges.subscribe((text) => { if (this.speech.isListening()) { this.speechGeneration++; if (this.useNova3) (this.speech as Nova3SpeechService).cancelRecognition(); else void this.speech.stopRecognition(); } this.interview.updateAnswer(text); });
+    this.answer.valueChanges.subscribe((text) => { if (this.speech.isListening() || this.nova.isCapturePending()) { this.speechGeneration++; void this.speech.stopRecognition(); } else if (this.nova.connectionState() === 'ERROR') this.nova.cancelRecognition(); this.interview.updateAnswer(text); });
     if (this.admin()) void this.checkSession();
     window.addEventListener('popstate', () => { this.stopSoundCheck(); if (this.speechLab) this.nova.cancelRecognition(); this.admin.set(location.pathname === '/admin'); if (this.admin()) void this.checkSession(); });
-    window.addEventListener('pagehide', () => this.stopSoundCheck());
+    window.addEventListener('pagehide', () => { this.stopSoundCheck(); this.nova.cancelRecognition(); });
     document.addEventListener('visibilitychange', () => {
       // Safari briefly hides the document while its microphone permission sheet is open.
       // Keep a pending permission request valid; an active stream is still closed on tab hide.
@@ -87,10 +87,12 @@ export class App {
   }
   start() {
     if (this.form.invalid || (this.form.controls.group.value === 'Other' && !!this.groupError())) { this.form.markAllAsTouched(); return; }
-    this.stopSoundCheck();
     if (this.useNova3) this.nova.cancelRecognition();
+    const preparedStream = this.stopSoundCheck(true);
     this.interview.start(this.form.controls.name.value, this.form.controls.group.value === 'Other' ? this.otherGroup.value : this.form.controls.group.value);
     this.syncAnswer();
+    if (this.interview.stage() === 'interview') { this.nova.inputDeviceId = this.microphone.value; this.nova.prepareInterview(preparedStream); }
+    else preparedStream?.getTracks().forEach((track) => track.stop());
   }
   async startSoundCheck() {
     this.stopSoundCheck();
@@ -126,18 +128,21 @@ export class App {
       } catch { /* The selected microphone remains usable without device enumeration. */ }
     } catch { if (generation === this.soundCheckGeneration) { this.stopSoundCheck(); this.soundCheckStatus.set('Microphone permission was not granted. You can retry or type every answer.'); } }
   }
-  stopSoundCheck() {
+  stopSoundCheck(keepStream = false): MediaStream | null {
     this.soundCheckGeneration++;
     if (this.soundCheckFrame) cancelAnimationFrame(this.soundCheckFrame);
     this.soundCheckFrame = 0;
-    this.soundCheckStream?.getTracks().forEach((track) => track.stop()); this.soundCheckStream = null;
+    const stream = keepStream ? this.soundCheckStream : null;
+    if (!keepStream) this.soundCheckStream?.getTracks().forEach((track) => track.stop());
+    this.soundCheckStream = null;
     void this.soundCheckContext?.close().catch(() => undefined); this.soundCheckContext = null;
     this.soundCheckActive.set(false); this.soundCheckLevel.set(0);
+    return stream;
   }
-  resume() { this.interview.resume(); this.syncAnswer(); }
+  resume() { this.interview.resume(); this.syncAnswer(); if (this.interview.stage() === 'interview') this.nova.prepareInterview(); }
   private clearNovaDisplay() { if (this.useNova3) { this.nova.confirmed.set(''); this.nova.provisional.set(''); } }
-  async move(delta: number) { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { await this.speech.stopRecognition(); this.speechGeneration++; this.interview.move(delta); this.syncAnswer(); this.clearNovaDisplay(); } finally { this.navigationBusy.set(false); } }
-  async next() { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { await this.speech.stopRecognition(); this.speechGeneration++; this.interview.next(); this.syncAnswer(); this.clearNovaDisplay(); } finally { this.navigationBusy.set(false); } }
+  async move(delta: number) { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { if (await this.speech.stopRecognition() === false) return; this.speechGeneration++; this.interview.move(delta); this.syncAnswer(); this.clearNovaDisplay(); } finally { this.navigationBusy.set(false); } }
+  async next() { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { if (await this.speech.stopRecognition() === false) return; this.speechGeneration++; if (this.interview.index() === this.questions.length - 1) await this.interview.submit(); else this.interview.move(1); this.syncAnswer(); this.clearNovaDisplay(); } finally { this.navigationBusy.set(false); } }
   private resetStudentSession() {
     this.stopSoundCheck();
     this.speechGeneration++;
@@ -152,7 +157,7 @@ export class App {
   }
   clearDraft() { if (confirm('Clear your saved interview draft and answers from this device?')) this.resetStudentSession(); }
   finishAndClear() { this.resetStudentSession(); }
-  async replayQuestion() { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { await this.speech.stopRecognition(); this.speechGeneration++; this.audio.replay(this.interview.currentQuestion().id); } finally { this.navigationBusy.set(false); } }
+  async replayQuestion() { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { if (await this.speech.stopRecognition() === false) return; this.speechGeneration++; this.audio.replay(this.interview.currentQuestion().id); } finally { this.navigationBusy.set(false); } }
   async inspectMicrophones() { if (!this.useNova3) return; try { const devices = await navigator.mediaDevices.enumerateDevices(); this.nova.availableMicrophones.set(devices.filter((item) => item.kind === 'audioinput').map((item) => ({ id: item.deviceId, label: item.label || 'Microphone' }))); } catch { this.soundCheckStatus.set('Input devices could not be checked. Browser default and typing remain available.'); } }
   testQuestionAudio() { if (this.useNova3) this.nova.cancelRecognition(); this.audio.test(); }
   async testMicrophone() {
@@ -167,7 +172,7 @@ export class App {
   }
   async toggleMic() {
     if (this.navigationBusy()) return;
-    if (this.speech.isListening()) { this.navigationBusy.set(true); try { await this.speech.stopRecognition(); } finally { this.navigationBusy.set(false); } return; }
+    if (this.speech.isListening() || this.nova.isCapturePending()) { this.navigationBusy.set(true); try { await this.speech.stopRecognition(); } finally { this.navigationBusy.set(false); } return; }
     this.audio.stop();
     this.recognitionBase = this.answer.value;
     if (this.useNova3) (this.speech as Nova3SpeechService).inputDeviceId = this.microphone.value;

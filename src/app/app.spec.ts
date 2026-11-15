@@ -8,7 +8,7 @@ import { QuestionAudioService } from './question-audio.service';
 
 describe('student screen', () => {
   function setup() {
-    TestBed.configureTestingModule({ imports: [App], providers: [{ provide: SpeechService, useValue: { status: () => 'Browser fallback unused', recognitionAvailable: () => false, isListening: () => false, stopRecognition: vi.fn() } }, { provide: Nova3SpeechService, useValue: { status: () => 'Stopped', recognitionAvailable: () => false, isListening: () => false, stopRecognition: vi.fn(), cancelRecognition: vi.fn(), provisional: signal(''), confirmed: signal('') } }, { provide: QuestionAudioService, useValue: { message: () => 'Audio unavailable', state: () => 'unavailable', enterQuestion: vi.fn(), stop: vi.fn(), reset: vi.fn() } }] });
+    TestBed.configureTestingModule({ imports: [App], providers: [{ provide: SpeechService, useValue: { status: () => 'Browser fallback unused', recognitionAvailable: () => false, isListening: () => false, stopRecognition: vi.fn() } }, { provide: Nova3SpeechService, useValue: { status: () => 'Stopped', connectionState: () => 'IDLE', recognitionAvailable: () => false, isListening: () => false, isCapturePending: () => false, stopRecognition: vi.fn(), cancelRecognition: vi.fn(), prepareInterview: vi.fn(), provisional: signal(''), confirmed: signal('') } }, { provide: QuestionAudioService, useValue: { message: () => 'Audio unavailable', state: () => 'unavailable', enterQuestion: vi.fn(), stop: vi.fn(), reset: vi.fn() } }] });
     return TestBed.createComponent(App);
   }
   it('shows the fixed interview welcome screen and setup action', async () => {
@@ -22,6 +22,29 @@ describe('student screen', () => {
     const fixture = setup();
     expect(fixture.componentInstance.speech).toBe(fixture.componentInstance.nova);
     expect(fixture.componentInstance.useNova3).toBe(true);
+  });
+
+  it('prepares Nova capture at Begin Interview', () => {
+    const fixture = setup(); const app = fixture.componentInstance;
+    app.form.setValue({ name: 'Synthetic Student', group: '7A' });
+    app.interview.stage.set('sound-check');
+    app.start();
+    expect(app.nova.prepareInterview).toHaveBeenCalledOnce();
+    expect(app.interview.stage()).toBe('interview');
+    app.finishAndClear();
+  });
+
+  it('waits for speech finalisation before changing questions', async () => {
+    const fixture = setup(); const app = fixture.componentInstance;
+    app.interview.stage.set('interview');
+    let finish!: (success: boolean) => void;
+    vi.mocked(app.nova.stopRecognition).mockReturnValueOnce(new Promise<boolean>((resolve) => { finish = resolve; }));
+    const navigation = app.next();
+    expect(app.interview.index()).toBe(0);
+    finish(true);
+    await navigation;
+    expect(app.interview.index()).toBe(1);
+    app.finishAndClear();
   });
 
   it('loads every teacher page beyond the former 100-record ceiling', async () => {

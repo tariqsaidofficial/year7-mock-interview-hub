@@ -28,7 +28,7 @@ describe('supportive interview timing', () => {
   afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
   function service() {
-    const speech = { stopRecognition: vi.fn() };
+    const speech = { stopRecognition: vi.fn(), cancelRecognition: vi.fn() };
     const audio = { enterQuestion: vi.fn(), stop: vi.fn(), reset: vi.fn() };
     TestBed.configureTestingModule({ providers: [InterviewService, { provide: Nova3SpeechService, useValue: speech }, { provide: QuestionAudioService, useValue: audio }, { provide: STUDENT_CSRF, useValue: vi.fn().mockResolvedValue('test-csrf') }] });
     return { interview: TestBed.inject(InterviewService), speech, audio };
@@ -62,12 +62,13 @@ describe('supportive interview timing', () => {
     interview.clear(); vi.useRealTimers();
   });
 
-  it('finishes only when Finish Interview is selected on question ten', () => {
+  it('finishes only when Finish Interview is selected on question ten', async () => {
     const { interview } = service();
     const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
     interview.showSetup(); interview.stage.set('sound-check'); interview.start('Example Student', '7A');
     interview.index.set(9);
     interview.next();
+    await Promise.resolve();
     expect(interview.stage()).toBe('offline-pending');
     online.mockRestore(); interview.clear(); vi.useRealTimers();
   });

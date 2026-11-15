@@ -90,6 +90,7 @@ describe('Nova-3 finalisation lifecycle', () => {
       static latest: FakeSocket;
       static closeAfterFinal = true;
       readyState = 1;
+      bufferedAmount = 0;
       onopen: (() => void) | null = null;
       onclose: (() => void) | null = null;
       onmessage: ((event: { data: string }) => void) | null = null;
@@ -110,7 +111,7 @@ describe('Nova-3 finalisation lifecycle', () => {
     expect(FakeSocket.latest.url).toContain('sample_rate=48000');
     expect(FakeSocket.latest.protocols[0]).toBe('bearer');
     const stopping = service.stopRecognition();
-    await vi.advanceTimersByTimeAsync(100);
+    await vi.advanceTimersByTimeAsync(3_200);
     await stopping;
     const sent = FakeSocket.latest.send.mock.calls.map(([data]) => data);
     expect(sent[0]).toBeInstanceOf(ArrayBuffer);
@@ -126,7 +127,7 @@ describe('Nova-3 finalisation lifecycle', () => {
     await vi.advanceTimersByTimeAsync(1);
     FakeSocket.latest.onmessage?.({ data: JSON.stringify({ type: 'Results', start: 0, duration: 1, is_final: false, channel: { alternatives: [{ transcript: 'Unconfirmed phrase' }] } }) });
     const silentStop = service.stopRecognition();
-    await vi.advanceTimersByTimeAsync(2_100);
+    await vi.advanceTimersByTimeAsync(5_100);
     await silentStop;
     expect(service.confirmed()).toBe('');
     expect(service.provisional()).toBe('Unconfirmed phrase');

@@ -91,7 +91,8 @@ export class InterviewService {
   next() { if (this.stage() !== 'interview') return; if (this.index() === 9) void this.submit(); else this.move(1); }
   async submit() {
     if (this.busy || !['interview', 'offline-pending', 'evaluation-error'].includes(this.stage())) return;
-    this.speech.stopRecognition(); this.audio.stop(); clearInterval(this.tickHandle); this.save();
+    if (await this.speech.stopRecognition() === false) { this.message.set('Check your speech answer and type any missing words before finishing.'); return; }
+    this.speech.cancelRecognition(); this.audio.stop(); clearInterval(this.tickHandle); this.save();
     if (!navigator.onLine) { this.stage.set('offline-pending'); this.message.set(this.savedOnDevice() ? 'Saved on this device. Feedback will be available when you are online.' : 'This device could not save your draft. Copy your answers before leaving.'); return; }
     this.busy = true; this.stage.set('evaluating'); this.message.set('');
     const controller = new AbortController();
@@ -130,7 +131,7 @@ export class InterviewService {
     catch { this.copyMessage.set('Copy did not work. Select the answers below to copy them.'); }
   }
   clear() {
-    this.speech.stopRecognition(); this.audio.reset(); clearInterval(this.tickHandle); clearDraft(); clearResult();
+    this.speech.cancelRecognition(); this.audio.reset(); clearInterval(this.tickHandle); clearDraft(); clearResult();
     this.id = ''; this.name.set(''); this.group.set(''); this.answers.set(QUESTIONS.map((q) => ({ questionId: q.id, text: '' })));
     this.startedAt.set(0); this.elapsedSeconds.set(0); this.evaluation.set(null); this.message.set(''); this.copyMessage.set(''); this.resultSaved.set(true); this.stage.set('welcome');
   }
