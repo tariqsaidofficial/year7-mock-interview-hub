@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Nova3SpeechService } from './nova3-speech.service';
 
-function harness() {
+function harness(options: { flushDelayMs?: number; missingFlush?: boolean; sendFinal?: boolean; closeOnCloseStream?: boolean; emitOnConnect?: boolean } = {}) {
   vi.useFakeTimers();
-  const track = { label: 'Synthetic adult microphone', readyState: 'live', stop: vi.fn() };
+  let ended: (() => void) | null = null;
+  const track = { label: 'Synthetic adult microphone', readyState: 'live', stop: vi.fn(), addEventListener: vi.fn((name: string, listener: () => void) => { if (name === 'ended') ended = listener; }) };
   const stream = { getAudioTracks: () => [track], getTracks: () => [track] } as unknown as MediaStream;
   const getUserMedia = vi.fn().mockResolvedValue(stream);
   Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia } });
@@ -15,14 +16,19 @@ function harness() {
     destination = {};
     resume = vi.fn().mockResolvedValue(undefined);
     close = vi.fn().mockResolvedValue(undefined);
-    createMediaStreamSource() { return { connect: vi.fn(), disconnect: vi.fn() }; }
+    createMediaStreamSource() { return { connect: vi.fn(() => { if (options.emitOnConnect) Worklet.latest.emit([71, 72]); }), disconnect: vi.fn() }; }
     createGain() { return { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() }; }
   }
   class Worklet {
     static latest: Worklet;
     port = { onmessage: null as ((event: { data: ArrayBuffer | { type: string; id?: number } }) => void) | null,
       postMessage: vi.fn((message: { type: string; id: number }) => {
-        if (message.type === 'flush') queueMicrotask(() => this.port.onmessage?.({ data: { type: 'flushed', id: message.id } }));
+        if (message.type === 'flush' && !options.missingFlush) {
+          setTimeout(() => {
+            if (options.flushDelayMs) this.emit([99]);
+            this.port.onmessage?.({ data: { type: 'flushed', id: message.id } });
+          }, options.flushDelayMs ?? 0);
+        }
       }) };
     connect = vi.fn(); disconnect = vi.fn();
     constructor() { Worklet.latest = this; }
@@ -43,16 +49,17 @@ function harness() {
     constructor(readonly url: string, readonly protocols: string[]) { Socket.instances.push(this); }
     send(data: string | ArrayBuffer) {
       this.sent.push(data);
-      if (typeof data === 'string' && JSON.parse(data).type === 'Finalize') {
+      if (typeof data === 'string' && JSON.parse(data).type === 'Finalize' && options.sendFinal !== false) {
         queueMicrotask(() => this.onmessage?.({ data: JSON.stringify({ type: 'Results', start: 0, duration: 1, is_final: true, from_finalize: true, channel: { alternatives: [{ transcript: Socket.finalText }] } }) }));
       }
+      if (typeof data === 'string' && JSON.parse(data).type === 'CloseStream' && options.closeOnCloseStream) queueMicrotask(() => this.close());
     }
     open() { this.readyState = 1; this.onopen?.(); }
     close() { this.readyState = 3; this.onclose?.(); }
   }
   vi.stubGlobal('AudioContext', Context); vi.stubGlobal('AudioWorkletNode', Worklet); vi.stubGlobal('WebSocket', Socket);
   const service = new Nova3SpeechService(); service.recognitionAvailable.set(true);
-  return { service, stream, track, getUserMedia, fetchMock, Worklet, Socket };
+  return { service, stream, track, endTrack: () => { track.readyState = 'ended'; ended?.(); }, getUserMedia, fetchMock, Worklet, Socket };
 }
 
 describe('immediate Nova-3 PCM capture', () => {
@@ -74,6 +81,7 @@ describe('immediate Nova-3 PCM capture', () => {
     expect(Socket.instances[0].sent).toEqual([]);
     await vi.advanceTimersByTimeAsync(5_000);
     Socket.instances[0].open();
+    expect(service.connectionReadyMs()).toBe(5_000);
     await vi.advanceTimersByTimeAsync(100);
     const audio = Socket.instances[0].sent.filter((item): item is ArrayBuffer => item instanceof ArrayBuffer);
     expect(audio.map((frame) => [...new Int16Array(frame)])).toEqual([[1, 2], [3, 4], [5, 6]]);
@@ -115,6 +123,115 @@ describe('immediate Nova-3 PCM capture', () => {
     expect(Socket.instances[0].sent.every((frame) => typeof frame === 'string')).toBe(true);
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('nova3-token'))).toHaveLength(1);
     expect(service.isListening()).toBe(false);
+    service.cancelRecognition();
+  });
+
+  it('measures connection readiness from preparation even when Speak happens later', async () => {
+    const { service, stream, Socket } = harness();
+    service.prepareInterview(stream);
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(5_000);
+    Socket.instances[0].open();
+    expect(service.connectionReadyMs()).toBe(5_000);
+    await vi.advanceTimersByTimeAsync(25_000);
+    service.startRecognition(() => undefined);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(service.connectionReadyMs()).toBe(5_000);
+    service.cancelRecognition();
+  });
+
+  it('keeps transport in local-capture state until actual PCM is submitted', async () => {
+    const { service, stream, Worklet, Socket } = harness();
+    service.prepareInterview(stream); await vi.advanceTimersByTimeAsync(0); Socket.instances[0].open();
+    expect(service.connectionReadyMs()).toBe(0);
+    service.startRecognition(() => undefined); await vi.advanceTimersByTimeAsync(0);
+    expect(service.connectionState()).toBe('RECORDING_LOCAL');
+    expect(Socket.instances[0].sent).toEqual([]);
+    Worklet.latest.emit([1, 2]);
+    expect(service.connectionState()).toBe('STREAMING');
+    service.cancelRecognition();
+  });
+
+  it('keeps a packet produced during AudioWorklet startup', async () => {
+    const { service, stream, Socket } = harness({ emitOnConnect: true });
+    service.prepareInterview(stream); await vi.advanceTimersByTimeAsync(0);
+    service.startRecognition(() => undefined); await vi.advanceTimersByTimeAsync(0);
+    Socket.instances[0].open();
+    const audio = Socket.instances[0].sent.filter((frame): frame is ArrayBuffer => frame instanceof ArrayBuffer);
+    expect(audio.map((frame) => [...new Int16Array(frame)])).toEqual([[71, 72]]);
+    service.cancelRecognition();
+  });
+
+  it('waits for a delayed flush acknowledgement and sends its last PCM before Finalize', async () => {
+    const { service, stream, Worklet, Socket } = harness({ flushDelayMs: 750 });
+    service.prepareInterview(stream); await vi.advanceTimersByTimeAsync(0); Socket.instances[0].open();
+    service.startRecognition(() => undefined); await vi.advanceTimersByTimeAsync(0);
+    Worklet.latest.emit([1]);
+    const stopping = service.stopRecognition();
+    await vi.advanceTimersByTimeAsync(700);
+    expect(Socket.instances[0].sent.some((frame) => typeof frame === 'string' && frame.includes('Finalize'))).toBe(false);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await stopping).toBe(true);
+    const sent = Socket.instances[0].sent;
+    expect(sent.filter((frame): frame is ArrayBuffer => frame instanceof ArrayBuffer).map((frame) => [...new Int16Array(frame)])).toEqual([[1], [99]]);
+    expect(JSON.parse(sent.at(-1) as string).type).toBe('Finalize');
+    service.cancelRecognition();
+  });
+
+  it('fails closed when AudioWorklet never acknowledges flush', async () => {
+    const { service, stream, Worklet, Socket } = harness({ missingFlush: true });
+    service.prepareInterview(stream); await vi.advanceTimersByTimeAsync(0); Socket.instances[0].open();
+    service.startRecognition(() => undefined); await vi.advanceTimersByTimeAsync(0);
+    Worklet.latest.emit([1]);
+    const stopping = service.stopRecognition();
+    await vi.advanceTimersByTimeAsync(1_100);
+    expect(await stopping).toBe(false);
+    expect(service.connectionState()).toBe('ERROR');
+    expect(service.status()).toContain('did not confirm its final audio packet');
+    expect(Socket.instances[0].sent.some((frame) => typeof frame === 'string' && frame.includes('Finalize'))).toBe(false);
+    expect(Socket.instances[0].readyState).toBe(3);
+    service.cancelRecognition();
+  });
+
+  it('ignores a flush acknowledgement that arrives after the timeout', async () => {
+    const { service, stream, Worklet, Socket } = harness({ flushDelayMs: 1_200 });
+    service.prepareInterview(stream); await vi.advanceTimersByTimeAsync(0); Socket.instances[0].open();
+    service.startRecognition(() => undefined); await vi.advanceTimersByTimeAsync(0);
+    Worklet.latest.emit([1]);
+    const stopping = service.stopRecognition();
+    await vi.advanceTimersByTimeAsync(1_050);
+    expect(await stopping).toBe(false);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(service.connectionState()).toBe('ERROR');
+    expect(Socket.instances[0].sent.some((frame) => typeof frame === 'string' && frame.includes('Finalize'))).toBe(false);
+    service.cancelRecognition();
+  });
+
+  it('does not equate CloseStream closure with a transcript and preserves silent answers for explicit Skip', async () => {
+    const { service, stream, Worklet, Socket } = harness({ sendFinal: false, closeOnCloseStream: true });
+    service.prepareInterview(stream); await vi.advanceTimersByTimeAsync(0); Socket.instances[0].open();
+    service.startRecognition(() => undefined); await vi.advanceTimersByTimeAsync(0);
+    Worklet.latest.emit([0, 0]);
+    const stopping = service.stopRecognition();
+    await vi.advanceTimersByTimeAsync(3_100);
+    expect(await stopping).toBe(false);
+    expect(service.confirmed()).toBe('');
+    expect(service.status()).toContain('No spoken words were confirmed');
+    expect(Socket.instances[0].readyState).toBe(3);
+    service.cancelRecognition();
+  });
+
+  it('stops claiming microphone capture after its track ends unexpectedly', async () => {
+    const { service, stream, endTrack, Worklet, Socket } = harness({ closeOnCloseStream: true });
+    service.prepareInterview(stream); await vi.advanceTimersByTimeAsync(0); Socket.instances[0].open();
+    service.startRecognition(() => undefined); await vi.advanceTimersByTimeAsync(0);
+    Worklet.latest.emit([1]);
+    endTrack();
+    expect(service.isListening()).toBe(false);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(await service.stopRecognition()).toBe(false);
+    expect(service.connectionState()).toBe('ERROR');
+    expect(service.status()).toContain('Microphone disconnected');
     service.cancelRecognition();
   });
 

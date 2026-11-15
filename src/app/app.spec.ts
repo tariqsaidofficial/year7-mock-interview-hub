@@ -47,6 +47,30 @@ describe('student screen', () => {
     app.finishAndClear();
   });
 
+  it('keeps the current question when finalisation fails', async () => {
+    const fixture = setup(); const app = fixture.componentInstance;
+    app.interview.stage.set('interview');
+    vi.mocked(app.nova.stopRecognition).mockResolvedValueOnce(false);
+    await app.next();
+    expect(app.interview.index()).toBe(0);
+    expect(app.nova.stopRecognition).toHaveBeenCalledTimes(1);
+    app.finishAndClear();
+  });
+
+  it('waits for speech to stop before an intentional Skip and does not stop it twice', async () => {
+    const fixture = setup(); const app = fixture.componentInstance;
+    app.interview.stage.set('interview');
+    let finish!: (success: boolean) => void;
+    vi.mocked(app.nova.stopRecognition).mockReturnValueOnce(new Promise<boolean>((resolve) => { finish = resolve; }));
+    const navigation = app.skip();
+    expect(app.interview.index()).toBe(0);
+    finish(false);
+    await navigation;
+    expect(app.interview.index()).toBe(1);
+    expect(app.nova.stopRecognition).toHaveBeenCalledTimes(1);
+    app.finishAndClear();
+  });
+
   it('loads every teacher page beyond the former 100-record ceiling', async () => {
     const fixture = setup(); const app = fixture.componentInstance;
     const records = Array.from({ length: 100 }, (_, index) => ({ id: `synthetic-${index}`, studentName: `Synthetic ${index}`, tutorGroup: '7A', completedAt: '2026-11-15T00:00:00Z', answers: [], evaluation: {} }));

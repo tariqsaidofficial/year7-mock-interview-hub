@@ -66,13 +66,15 @@ export class Nova3SpeechService {
   private pumpTimer: ReturnType<typeof setInterval> | null = null;
   private keepAliveTimer: ReturnType<typeof setInterval> | null = null;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
-  private flushResolve: (() => void) | null = null;
+  private flushResolve: ((acknowledged: boolean) => void) | null = null;
   private finalResolve: (() => void) | null = null;
   private closeResolve: (() => void) | null = null;
   private firstAudioAt = 0;
   private startedAt = 0;
+  private connectionStartedAt = 0;
   private connectedAt = 0;
   private audioBytes = 0;
+  private trackEnded = false;
   private trialWatchdog: ReturnType<typeof setTimeout> | null = null;
   private trialDeadline = 0;
   private readonly trialStorageKey = 'y7-nova3-live-trial-connections';
@@ -99,6 +101,7 @@ export class Nova3SpeechService {
   prepareInterview(soundCheckStream?: MediaStream | null): void {
     if (!this.recognitionAvailable() || !navigator.onLine) { this.status.set('Speech is unavailable. You can type every answer.'); return; }
     this.interviewMode = true;
+    this.startedAt = Date.now();
     if (soundCheckStream) {
       this.stream?.getTracks().forEach((track) => track.stop());
       this.stream = soundCheckStream;
@@ -140,7 +143,7 @@ export class Nova3SpeechService {
     this.state = new NovaTranscript(); this.state.nextStream();
     this.confirmed.set(''); this.provisional.set(''); this.finalSegments.set(0);
     this.firstFinalLatencyMs.set(null); this.firstInterimLatencyMs.set(null); this.finalisationDelayMs.set(null);
-    this.firstAudioAt = 0; this.startedAt = Date.now(); this.audioBytes = 0; this.audioSecondsSent.set(0);
+    this.firstAudioAt = 0; this.startedAt = Date.now(); this.audioBytes = 0; this.audioSecondsSent.set(0); this.trackEnded = false;
     this.queue = []; this.queuedBytes = 0; this.nextSendAt = 0; this.overflowed = false; this.deliveryFailed = false; this.recordingReconnects = 0;
     this.usageEventId = crypto.randomUUID();
     if (this.boundedTrial) {
@@ -176,20 +179,36 @@ export class Nova3SpeechService {
       const source = this.context.createMediaStreamSource(this.stream);
       const worklet = new AudioWorkletNode(this.context, 'nova3-pcm');
       const mute = this.context.createGain(); mute.gain.value = 0;
-      source.connect(worklet); worklet.connect(mute); mute.connect(this.context.destination);
       this.source = source; this.worklet = worklet; this.mute = mute;
-      this.recording = true;
-      this.connectionState.set(this.socket?.readyState === WebSocket.OPEN ? 'STREAMING' : 'RECORDING_LOCAL');
-      this.status.set(this.socket?.readyState === WebSocket.OPEN ? 'Listening with Nova-3' : 'Recording locally while speech service connects…');
+      // Install the receiver before connecting the graph: a fast worklet may
+      // publish its first PCM packet immediately after source.connect().
       worklet.port.onmessage = (event: MessageEvent<ArrayBuffer | { type: string; id?: number; value?: number }>) => {
         if (generation !== this.generation || capture !== this.captureGeneration) return;
         if (!(event.data instanceof ArrayBuffer)) {
           if (event.data?.type === 'level') this.audioLevel.set(Math.min(1, (event.data.value || 0) * 8));
-          if (event.data?.type === 'flushed' && event.data.id === capture) this.flushResolve?.();
+          if (event.data?.type === 'flushed' && event.data.id === capture) this.flushResolve?.(true);
           return;
         }
         this.enqueue(event.data);
       };
+      const track = this.stream.getAudioTracks()[0];
+      track?.addEventListener?.('ended', () => {
+        if (generation !== this.generation || capture !== this.captureGeneration || !this.recording) return;
+        this.trackEnded = true; this.recording = false;
+        this.connectionState.set('ERROR');
+        this.status.set('Microphone disconnected. Check your confirmed words and type any missing words.');
+        void this.stopRecognition();
+      }, { once: true });
+      source.connect(worklet); worklet.connect(mute); mute.connect(this.context.destination);
+      this.recording = true;
+      this.connectionState.set(this.audioBytes > 0 && this.socket?.readyState === WebSocket.OPEN ? 'STREAMING' : 'RECORDING_LOCAL');
+      this.status.set(this.audioBytes > 0 && this.socket?.readyState === WebSocket.OPEN ? 'Listening with Nova-3' : this.socket?.readyState === WebSocket.OPEN ? 'Recording locally. Preparing audio transport…' : 'Recording locally while speech service connects…');
+      if (track?.readyState === 'ended') {
+        this.trackEnded = true; this.recording = false;
+        this.connectionState.set('ERROR');
+        this.status.set('Microphone disconnected. Check your answer and type any missing words.');
+        void this.stopRecognition();
+      }
     } catch {
       if (generation !== this.generation || capture !== this.captureGeneration) return;
       this.recording = false; this.deliveryFailed = true; this.connectionState.set('ERROR');
@@ -226,6 +245,7 @@ export class Nova3SpeechService {
       // Drain recorded backlog at no more than twice realtime; the worklet
       // naturally emits larger packets, so sending them all at once is unsafe.
       this.nextSendAt = Date.now() + Math.max(1, frame.byteLength / (2 * (this.context?.sampleRate || 1)) * 500);
+      if (this.recording) { this.connectionState.set('STREAMING'); this.status.set('Listening with Nova-3'); }
     } catch {
       this.queue.unshift(frame); this.queuedBytes += frame.byteLength;
       this.connectionErrors.update((count) => count + 1);
@@ -244,6 +264,7 @@ export class Nova3SpeechService {
   private connect(generation: number, attempt: number): Promise<void> {
     if (this.connectPromise) return this.connectPromise;
     if (this.socket?.readyState === WebSocket.OPEN) return Promise.resolve();
+    this.connectionStartedAt = Date.now();
     const pending = (async () => {
       for (let retry = attempt; retry <= (this.boundedTrial ? attempt : 1); retry++) {
         this.connectionState.set(retry ? 'RECONNECTING' : 'CONNECTING');
@@ -291,9 +312,9 @@ export class Nova3SpeechService {
         opened = true;
         clearTimeout(watchdog);
         if (generation !== this.generation) { socket.close(); resolve(); return; }
-        this.connectedAt = Date.now(); this.connectionReadyMs.set(this.connectedAt - this.startedAt);
-        this.connectionState.set(this.recording ? 'STREAMING' : 'READY');
-        this.status.set(this.recording ? 'Listening with Nova-3' : 'Speech connection ready. Tap to speak.');
+        this.connectedAt = Date.now(); this.connectionReadyMs.set(this.connectedAt - this.connectionStartedAt);
+        this.connectionState.set(this.recording ? 'RECORDING_LOCAL' : 'READY');
+        this.status.set(this.recording ? 'Recording locally; sending buffered audio…' : 'Speech connection ready. Tap to speak.');
         this.startKeepAlive(socket);
         this.pump();
         resolve();
@@ -375,13 +396,14 @@ export class Nova3SpeechService {
       }
     }
     if (this.worklet) {
-      await new Promise<void>((resolve) => {
-        const timeout = setTimeout(resolve, 1_000);
-        this.flushResolve = () => { clearTimeout(timeout); resolve(); };
+      const acknowledged = await new Promise<boolean>((resolve) => {
+        const timeout = setTimeout(() => { this.flushResolve = null; resolve(false); }, 1_000);
+        this.flushResolve = (value) => { clearTimeout(timeout); resolve(value); };
         try { this.worklet?.port.postMessage({ type: 'flush', id: capture }); }
-        catch { clearTimeout(timeout); resolve(); }
+        catch { clearTimeout(timeout); resolve(false); }
       });
       this.flushResolve = null;
+      if (!acknowledged) return this.failCapture('The microphone did not confirm its final audio packet. Check your answer and type any missing words.', started);
     }
     if (generation !== this.generation || capture !== this.captureGeneration) return false;
     this.recording = false; this.disconnectAudioGraph();
@@ -405,7 +427,7 @@ export class Nova3SpeechService {
     });
     if (generation !== this.generation) return false;
     this.reportUsage(); this.clearTrialWatchdog();
-    if (finalised && !this.overflowed) {
+    if (finalised && !this.overflowed && !this.trackEnded && this.state.finalCount > 0 && !this.state.hasProvisional) {
       this.finalisationDelayMs.set(Date.now() - started);
       this.callback = null;
       this.connectionState.set('READY'); this.status.set('Stopped');
@@ -423,9 +445,26 @@ export class Nova3SpeechService {
     this.finalisationDelayMs.set(Date.now() - started);
     this.callback = null;
     if (!closed && socket.readyState !== WebSocket.CLOSED) socket.close();
-    this.connectionState.set(closed && !this.overflowed ? 'CLOSED' : 'ERROR');
-    this.status.set(this.overflowed || !closed || this.state.hasProvisional ? 'Speech service could not confirm all final words. Check your answer before continuing.' : 'Stopped');
-    return closed && !this.overflowed && !this.state.hasProvisional;
+    const confirmedWords = this.state.finalCount > 0 && !!this.state.finalText && !this.state.hasProvisional;
+    const successful = closed && confirmedWords && !this.overflowed && !this.trackEnded;
+    this.deliveryFailed = !successful;
+    this.connectionState.set(successful ? 'CLOSED' : 'ERROR');
+    this.status.set(successful ? 'Stopped' : this.trackEnded ? 'Microphone disconnected. Check your confirmed words and type any missing words.' : this.overflowed || this.state.hasProvisional ? 'Speech service could not confirm all final words. Check your answer before continuing.' : confirmedWords ? 'Speech stopped unexpectedly. Check your answer before continuing.' : 'No spoken words were confirmed. Try again, type your answer, or choose Skip.');
+    return successful;
+  }
+
+  private failCapture(message: string, started: number): false {
+    this.deliveryFailed = true; this.recording = false; this.generation++; this.captureGeneration++;
+    this.reportUsage(); this.clearTrialWatchdog(); this.stopKeepAlive();
+    this.callback = null; this.flushResolve = null;
+    this.disconnectAudioGraph();
+    const socket = this.socket; this.socket = null; socket?.close();
+    this.connectPromise = null;
+    this.stream?.getTracks().forEach((track) => track.stop()); this.stream = null;
+    void this.context?.close().catch(() => undefined); this.context = null; this.workletReady = null;
+    this.finalisationDelayMs.set(Date.now() - started);
+    this.connectionState.set('ERROR'); this.status.set(message);
+    return false;
   }
 
   // A question or session boundary invalidates every pending callback.
@@ -433,7 +472,7 @@ export class Nova3SpeechService {
     this.reportUsage();
     this.generation++; this.captureGeneration++; this.callback = null; this.recording = false; this.stopping = null; this.capturePromise = null;
     this.stopKeepAlive(); this.clearTrialWatchdog();
-    this.flushResolve?.(); this.flushResolve = null;
+    this.flushResolve?.(false); this.flushResolve = null;
     this.finalResolve?.(); this.finalResolve = null;
     this.closeResolve?.(); this.closeResolve = null;
     this.audioLevel.set(0); this.queue = []; this.queuedBytes = 0; this.overflowed = false; this.deliveryFailed = false;
@@ -455,6 +494,7 @@ export class Nova3SpeechService {
 
   private disconnectAudioGraph() {
     this.source?.disconnect(); this.source = null;
+    if (this.worklet) this.worklet.port.onmessage = null;
     this.worklet?.disconnect(); this.worklet = null;
     this.mute?.disconnect(); this.mute = null;
   }

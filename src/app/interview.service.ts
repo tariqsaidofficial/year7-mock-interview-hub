@@ -45,7 +45,7 @@ export class InterviewService {
       else this.stage.set('resume-draft');
     } else clearResult();
     window.addEventListener('online', () => { this.online.set(true); if (this.stage() === 'offline-pending') void this.submit(); });
-    window.addEventListener('offline', () => { this.online.set(false); this.speech.stopRecognition(); });
+    window.addEventListener('offline', () => { this.online.set(false); void this.speech.stopRecognition(); });
     document.addEventListener('visibilitychange', () => this.tick());
   }
   showSetup() { this.stage.set('setup'); }
@@ -85,7 +85,7 @@ export class InterviewService {
     if (this.busy || this.stage() !== 'interview') return;
     const next = this.index() + delta;
     if (next < 0 || next >= QUESTIONS.length) return;
-    this.speech.stopRecognition(); this.audio.stop(); this.index.set(next); this.save(); this.tick();
+    this.audio.stop(); this.index.set(next); this.save(); this.tick();
     this.audio.enterQuestion(this.currentQuestion().id);
   }
   next() { if (this.stage() !== 'interview') return; if (this.index() === 9) void this.submit(); else this.move(1); }

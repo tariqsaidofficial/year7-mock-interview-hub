@@ -142,6 +142,7 @@ export class App {
   resume() { this.interview.resume(); this.syncAnswer(); if (this.interview.stage() === 'interview') this.nova.prepareInterview(); }
   private clearNovaDisplay() { if (this.useNova3) { this.nova.confirmed.set(''); this.nova.provisional.set(''); } }
   async move(delta: number) { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { if (await this.speech.stopRecognition() === false) return; this.speechGeneration++; this.interview.move(delta); this.syncAnswer(); this.clearNovaDisplay(); } finally { this.navigationBusy.set(false); } }
+  async skip() { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { await this.speech.stopRecognition(); if (this.nova.connectionState() === 'ERROR') this.nova.cancelRecognition(); this.speechGeneration++; this.interview.move(1); this.syncAnswer(); this.clearNovaDisplay(); } finally { this.navigationBusy.set(false); } }
   async next() { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { if (await this.speech.stopRecognition() === false) return; this.speechGeneration++; if (this.interview.index() === this.questions.length - 1) await this.interview.submit(); else this.interview.move(1); this.syncAnswer(); this.clearNovaDisplay(); } finally { this.navigationBusy.set(false); } }
   private resetStudentSession() {
     this.stopSoundCheck();
