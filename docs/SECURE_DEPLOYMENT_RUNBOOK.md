@@ -20,8 +20,7 @@ This document plans future deployment; it is not authority to deploy to Vercel o
 | `FIRESTORE_DATABASE_ID` | Existing named Enterprise Native DB | yes | value may appear in `.env.example` |
 | `INTERVIEW_RUN_ID` | Unique synthetic run ID for tests | yes | actual run configuration should be environment-specific |
 | `INTERVIEW_RUN_OPEN` | Keep `false` until approved | yes | no runtime secret |
-| `MAX_GUEST_SESSIONS` | About class size + allowance | yes | no runtime secret |
-| `MAX_GUEST_SESSIONS_PER_IP` | Test behind school NAT | yes | no runtime secret |
+| `PAID_OPERATIONS_ENABLED` | `true` only while provider spend is authorised; `false` pauses new paid work | yes | no runtime secret |
 | `APP_ORIGIN` | Exact deployed HTTPS domain, localhost in local test | yes | no runtime secret |
 | `SESSION_PEPPER` | Random >=32 characters, private, stable during a run | yes | NEVER |
 | `ADMIN_PASSWORD_HASH` | generated with `scripts/hash-admin-password.mjs` locally | yes | NEVER |

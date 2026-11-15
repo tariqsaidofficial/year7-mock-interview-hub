@@ -24,6 +24,20 @@ describe('student screen', () => {
     expect(fixture.componentInstance.useNova3).toBe(true);
   });
 
+  it('loads every teacher page beyond the former 100-record ceiling', async () => {
+    const fixture = setup(); const app = fixture.componentInstance;
+    const records = Array.from({ length: 100 }, (_, index) => ({ id: `synthetic-${index}`, studentName: `Synthetic ${index}`, tutorGroup: '7A', completedAt: '2026-11-15T00:00:00Z', answers: [], evaluation: {} }));
+    const makePage = (slice: typeof records, nextCursor: string | null) => new Response(JSON.stringify({ runId: 'synthetic-run', records: slice, pendingCount: 0, nextCursor }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(makePage(records.slice(0, 50), 'a'.repeat(64))).mockResolvedValueOnce(makePage(records.slice(50), 'b'.repeat(64))).mockResolvedValueOnce(makePage([{ ...records[0], id: 'synthetic-100' }], null));
+    try {
+      await app.refresh();
+      expect(app.records()).toHaveLength(101);
+      expect(app.runId()).toBe('synthetic-run');
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock.mock.calls[1][0]).toContain(`cursor=${'a'.repeat(64)}`);
+    } finally { fetchMock.mockRestore(); }
+  });
+
   it('warns before setup when the classroom run is closed or status cannot be checked', async () => {
     const fixture = setup(); const app = fixture.componentInstance;
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(JSON.stringify({ open: false }), { status: 200, headers: { 'Content-Type': 'application/json' } })).mockResolvedValueOnce(new Response('<!doctype html>', { status: 404, headers: { 'Content-Type': 'text/html' } })).mockResolvedValueOnce(new Response(JSON.stringify({ open: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }));

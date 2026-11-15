@@ -4,8 +4,10 @@ import type { ApiRequest, ApiResponse } from '../server/http';
 const getSession = vi.fn(); const validCsrf = vi.fn(); const runTransaction = vi.fn();
 const doc = vi.fn((id: string) => ({ id }));
 const db = vi.fn(() => ({ collection: () => ({ doc: () => ({ collection: () => ({ doc }) }) }), runTransaction }));
+const reserveSpeechGrant = vi.fn(); const recordUsage = vi.fn();
 vi.mock('../server/session', () => ({ getSession, validCsrf }));
 vi.mock('../server/firebase-admin', () => ({ db, runId: () => 'synthetic-run' }));
+vi.mock('../server/usage', () => ({ reserveSpeechGrant, recordUsage }));
 
 function response() {
   const state: { status?: number; body?: unknown } = {};
@@ -18,6 +20,7 @@ describe('Nova-3 temporary token gate', () => {
   beforeEach(() => {
     vi.stubEnv('INTERVIEW_RUN_OPEN', 'true'); vi.stubEnv('DEEPGRAM_API_KEY', 'synthetic-server-only-key');
     getSession.mockReset().mockResolvedValue({ id: 'synthetic-session' }); validCsrf.mockReset().mockReturnValue(true);
+    reserveSpeechGrant.mockReset().mockResolvedValue(true); recordUsage.mockReset().mockResolvedValue(undefined);
     runTransaction.mockReset().mockImplementation(async (callback) => callback({ get: async () => ({ get: () => 0 }), set: vi.fn() }));
   });
   afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
@@ -33,9 +36,24 @@ describe('Nova-3 temporary token gate', () => {
     const { default: handler } = await import('../api/guest/nova3-token');
     vi.stubEnv('INTERVIEW_RUN_OPEN', 'false'); const closed = response(); await handler(request, closed.res);
     vi.stubEnv('INTERVIEW_RUN_OPEN', 'true');
-    runTransaction.mockImplementationOnce(async (callback) => callback({ get: async () => ({ get: () => 3 }), set: vi.fn() }));
+    reserveSpeechGrant.mockResolvedValueOnce(false);
     const limited = response(); await handler(request, limited.res);
     expect([closed.state.status, limited.state.status]).toEqual([403, 429]); expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('pauses new paid grants without contacting Deepgram', async () => {
+    const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
+    vi.stubEnv('PAID_OPERATIONS_ENABLED', 'false');
+    const { default: handler } = await import('../api/guest/nova3-token');
+    const paused = response(); await handler(request, paused.res);
+    expect(paused.state.status).toBe(503); expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it('counts a provider failure without exposing the key or losing the answer', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error('synthetic network failure')); vi.stubGlobal('fetch', fetchMock);
+    const { default: handler } = await import('../api/guest/nova3-token');
+    const failed = response(); await handler(request, failed.res);
+    expect(failed.state.status).toBe(503);
+    expect(recordUsage).toHaveBeenCalledWith('synthetic-session', { providerErrors: 1 });
+    expect(JSON.stringify(failed.state.body)).not.toContain('synthetic-server-only-key');
   });
   it('returns only a short-lived grant and never the permanent key', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ access_token: 'synthetic.jwt.token', expires_in: 30 }), { status: 200 })); vi.stubGlobal('fetch', fetchMock);

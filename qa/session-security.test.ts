@@ -26,8 +26,8 @@ import { allowAdminAttempt, getSession, issueCsrf, issueGuest, revokeSession, sa
 function request(cookie = '', ip = '192.0.2.1', origin = 'https://class.example'): ApiRequest { return { headers: { cookie, origin }, socket: { remoteAddress: ip } } as ApiRequest; }
 function response() { const headers = new Map<string, string>(); return { headers, res: { setHeader: (key: string, value: string) => headers.set(key, value) } as ApiResponse }; }
 describe('server-side session security', () => {
-  beforeEach(() => { mocks.documents.clear(); vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-12T09:00:00Z')); process.env['SESSION_PEPPER'] = 'synthetic-secret-with-at-least-32-characters'; process.env['APP_ORIGIN'] = 'https://class.example'; process.env['INTERVIEW_RUN_OPEN'] = 'true'; process.env['MAX_GUEST_SESSIONS'] = '40'; delete process.env['VERCEL']; });
-  afterEach(() => { vi.useRealTimers(); for (const key of ['SESSION_PEPPER', 'APP_ORIGIN', 'INTERVIEW_RUN_OPEN', 'MAX_GUEST_SESSIONS', 'MAX_GUEST_SESSIONS_PER_IP', 'ADMIN_PASSWORD_HASH']) delete process.env[key]; });
+  beforeEach(() => { mocks.documents.clear(); vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-12T09:00:00Z')); process.env['SESSION_PEPPER'] = 'synthetic-secret-with-at-least-32-characters'; process.env['APP_ORIGIN'] = 'https://class.example'; process.env['INTERVIEW_RUN_OPEN'] = 'true'; delete process.env['VERCEL']; });
+  afterEach(() => { vi.useRealTimers(); for (const key of ['SESSION_PEPPER', 'APP_ORIGIN', 'INTERVIEW_RUN_OPEN', 'ADMIN_PASSWORD_HASH']) delete process.env[key]; });
   it('issues a secure opaque cookie, expires it, and rejects a revoked cookie replay', async () => {
     const output = response(); const issued = await issueGuest(request(), output.res);
     expect(issued.kind).toBe('created');
@@ -45,19 +45,18 @@ describe('server-side session security', () => {
     vi.advanceTimersByTime(12 * 60 * 60 * 1000 + 1);
     expect(await getSession(request(renewed.headers.get('Set-Cookie')!.split(';')[0]), 'guest')).toBeNull();
   });
-  it('limits guest creation per address and closes the run', async () => {
-    process.env['MAX_GUEST_SESSIONS_PER_IP'] = '6';
-    for (let i = 0; i < 6; i++) expect((await issueGuest(request(), response().res)).kind).toBe('created');
-    expect((await issueGuest(request(), response().res)).kind).toBe('limited');
-    expect((await issueGuest(request('', '192.0.2.2'), response().res)).kind).toBe('created');
+  it('reuses a valid guest cookie and closes the run to new sessions', async () => {
+    const first = response(); expect((await issueGuest(request(), first.res)).kind).toBe('created');
+    const cookie = first.headers.get('Set-Cookie')!.split(';')[0];
+    expect((await issueGuest(request(cookie), response().res)).kind).toBe('existing');
+    expect(mocks.documents.size).toBe(1);
     process.env['INTERVIEW_RUN_OPEN'] = 'false';
     expect((await issueGuest(request('', '192.0.2.3'), response().res)).kind).toBe('closed');
   });
-  it('enforces a run-wide guest ceiling across addresses', async () => {
-    process.env['MAX_GUEST_SESSIONS'] = '2';
-    expect((await issueGuest(request('', '192.0.2.1'), response().res)).kind).toBe('created');
-    expect((await issueGuest(request('', '192.0.2.2'), response().res)).kind).toBe('created');
-    expect((await issueGuest(request('', '192.0.2.3'), response().res)).kind).toBe('limited');
+  it('allows 400 independent guests behind one public address with no slot or IP counter', async () => {
+    for (let i = 0; i < 400; i++) expect((await issueGuest(request(), response().res)).kind).toBe('created');
+    expect(mocks.documents.size).toBe(400);
+    expect([...mocks.documents.keys()].every((key) => key.includes('/sessions/'))).toBe(true);
   });
   it('limits administrator attempts per address and rejects wrong origin', async () => {
     for (let i = 0; i < 5; i++) expect(await allowAdminAttempt(request())).toBe(true);

@@ -5,12 +5,13 @@ const mocks = vi.hoisted(() => {
   const docs = new Map<string, Record<string, unknown>>();
   const evaluate = vi.fn(async () => ({ formattedCopyableText: 'Synthetic feedback', categories: [], whatWentWell: ['a', 'b'], evenBetterIf: 'c', overallSummary: 'd' }));
   const ref = (uid: string) => ({ uid, update: async (patch: Record<string, unknown>) => { docs.set(uid, { ...docs.get(uid), ...patch }); } });
-  const db = () => ({ runTransaction: async (fn: (tx: { get: (r: {uid: string}) => Promise<{ exists: boolean; data: () => Record<string, unknown>; get: (field: string) => unknown }>; create: (r: {uid: string}, value: Record<string, unknown>) => void; update: (r: {uid: string}, value: Record<string, unknown>) => void }) => Promise<unknown>) => fn({ get: async (r) => ({ exists: docs.has(r.uid), data: () => docs.get(r.uid)!, get: (field) => docs.get(r.uid)?.[field] }), create: (r, value) => { docs.set(r.uid, value); }, update: (r, value) => { docs.set(r.uid, { ...docs.get(r.uid), ...value }); } }) });
+  const db = () => ({ runTransaction: async (fn: (tx: { get: (r: {uid: string}) => Promise<{ exists: boolean; data: () => Record<string, unknown>; get: (field: string) => unknown }>; create: (r: {uid: string}, value: Record<string, unknown>) => void; update: (r: {uid: string}, value: Record<string, unknown>) => void; set: (r: {uid: string}, value: Record<string, unknown>) => void }) => Promise<unknown>) => fn({ get: async (r) => ({ exists: docs.has(r.uid), data: () => docs.get(r.uid)!, get: (field) => docs.get(r.uid)?.[field] }), create: (r, value) => { docs.set(r.uid, value); }, update: (r, value) => { docs.set(r.uid, { ...docs.get(r.uid), ...value }); }, set: () => undefined }) });
   return { docs, evaluate, ref, db };
 });
 vi.mock('../server/firebase-admin', () => ({ recordsCollection: () => ({ doc: mocks.ref }), runId: () => 'demo-run', db: mocks.db }));
 vi.mock('../server/session', () => ({ getSession: async (req: ApiRequest) => ({ id: String(req.headers['x-test-session'] || 'student-1'), role: 'guest' }), validCsrf: () => true }));
 vi.mock('../server/openrouter', () => ({ evaluate: mocks.evaluate }));
+vi.mock('../server/usage', () => ({ usageRef: (sessionId: string) => ({ uid: `usage-${sessionId}` }) }));
 function response() { const state: { status?: number; body?: unknown } = {}; const res = { setHeader: vi.fn(), status(code: number) { state.status = code; return this; }, json(body: unknown) { state.body = body; } } as unknown as ApiResponse; return { state, res }; }
 describe('submission idempotency', () => {
   beforeEach(() => { process.env['INTERVIEW_RUN_OPEN'] = 'true'; mocks.docs.clear(); mocks.evaluate.mockReset().mockResolvedValue({ formattedCopyableText: 'Synthetic feedback', categories: [], whatWentWell: ['a', 'b'], evenBetterIf: 'c', overallSummary: 'd' }); });
@@ -61,6 +62,20 @@ describe('submission idempotency', () => {
     expect(statuses).toEqual([503, 503, 429]);
     expect(mocks.evaluate).toHaveBeenCalledTimes(2);
     expect(mocks.docs.get('student-1')?.['answers']).toEqual(body.answers);
+  });
+  it('pauses paid evaluation without consuming attempts and still serves a cached result', async () => {
+    const { default: handler } = await import('../api/evaluate');
+    const body = { requestId: crypto.randomUUID(), studentName: 'Synthetic Student', tutorGroup: '7A', answers: QUESTIONS.map((q) => ({ questionId: q.id, text: '' })) };
+    const req = { method: 'POST', headers: {}, body } as ApiRequest;
+    process.env['PAID_OPERATIONS_ENABLED'] = 'false';
+    const paused = response(); await handler(req, paused.res);
+    expect(paused.state.status).toBe(503); expect(mocks.evaluate).not.toHaveBeenCalled(); expect(mocks.docs.size).toBe(0);
+    process.env['PAID_OPERATIONS_ENABLED'] = 'true';
+    const first = response(); await handler(req, first.res); expect(first.state.status).toBe(200);
+    process.env['PAID_OPERATIONS_ENABLED'] = 'false';
+    const cached = response(); await handler(req, cached.res); expect(cached.state.status).toBe(200);
+    expect(mocks.evaluate).toHaveBeenCalledTimes(1);
+    delete process.env['PAID_OPERATIONS_ENABLED'];
   });
 
 });

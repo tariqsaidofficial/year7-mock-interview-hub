@@ -4,6 +4,8 @@ import { getSession, validCsrf } from '../server/session';
 import { submissionSchema } from '../server/contract';
 import { evaluate } from '../server/openrouter';
 import { ApiRequest, ApiResponse, jsonBody, respond, safeError } from '../server/http';
+import { FieldValue } from 'firebase-admin/firestore';
+import { usageRef } from '../server/usage';
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') return respond(res, 405, { error: 'Method not allowed' });
@@ -32,11 +34,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         const prior = snap.data()!;
         if (prior['requestId'] !== submission.requestId || prior['fingerprint'] !== fingerprint) return { kind: 'mismatch' as const };
         if (prior['status'] === 'complete') return { kind: 'complete' as const, evaluation: prior['evaluation'] };
+        if (process.env['PAID_OPERATIONS_ENABLED'] === 'false') return { kind: 'paused' as const };
         if (prior['status'] === 'processing' && Date.now() - Number(prior['processingStartedAt'] || 0) < 120_000) return { kind: 'processing' as const };
         if ((prior['attempts'] || 0) >= 2) return { kind: 'limit' as const };
         tx.update(ref, { status: 'processing', processingStartedAt: Date.now(), leaseId, attempts: (prior['attempts'] || 0) + 1 });
         return { kind: 'new' as const };
       }
+      if (process.env['PAID_OPERATIONS_ENABLED'] === 'false') return { kind: 'paused' as const };
       tx.create(ref, { runId: runId(), ownerSessionId: session.id, requestId: submission.requestId, fingerprint, status: 'processing', processingStartedAt: Date.now(), leaseId, attempts: 1, studentName: submission.studentName, tutorGroup: submission.tutorGroup, answers: submission.answers, createdAt: new Date().toISOString() });
       return { kind: 'new' as const };
     });
@@ -44,12 +48,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (decision.kind === 'mismatch') return respond(res, 409, { error: 'An interview has already been submitted from this device for this session.' });
     if (decision.kind === 'processing') return respond(res, 409, { error: 'Your feedback is still being prepared. Please try again shortly.' });
     if (decision.kind === 'limit') return respond(res, 429, { error: 'The feedback service could not finish. Please ask your teacher for help.' });
+    if (decision.kind === 'paused') return respond(res, 503, { error: 'Feedback is paused by the school. Your answers remain on this device for retry.' });
     let evaluation;
-    try { evaluation = await evaluate(submission.answers); }
+    let modelUsage = { promptTokens: 0, completionTokens: 0 };
+    let providerErrors = 0;
+    try { evaluation = await evaluate(submission.answers, (usage) => { modelUsage = usage; }, () => { providerErrors++; }); }
     catch {
       await db().runTransaction(async (tx) => {
         const snap = await tx.get(ref);
-        if (snap.exists && snap.get('leaseId') === leaseId && snap.get('status') === 'processing') tx.update(ref, { status: 'failed' });
+        if (snap.exists && snap.get('leaseId') === leaseId && snap.get('status') === 'processing') {
+          tx.update(ref, { status: 'failed' });
+          tx.set(usageRef(session.id), { providerErrors: FieldValue.increment(Math.max(1, providerErrors)), updatedAt: Date.now() }, { merge: true });
+        }
       });
       return respond(res, 503, { error: 'Feedback is unavailable right now. Please retry when online.' });
     }
@@ -59,6 +69,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       if (snap.get('status') === 'complete') return { kind: 'complete' as const, evaluation: snap.get('evaluation') };
       if (snap.get('status') !== 'processing' || snap.get('leaseId') !== leaseId) return { kind: 'stale' as const };
       tx.update(ref, { status: 'complete', evaluation, completedAt: new Date().toISOString() });
+      tx.set(usageRef(session.id), { completedEvaluations: FieldValue.increment(1), providerErrors: FieldValue.increment(providerErrors), promptTokens: FieldValue.increment(modelUsage.promptTokens), completionTokens: FieldValue.increment(modelUsage.completionTokens), updatedAt: Date.now() }, { merge: true });
       return { kind: 'complete' as const, evaluation };
     });
     if (final.kind === 'complete') return respond(res, 200, { evaluation: final.evaluation });

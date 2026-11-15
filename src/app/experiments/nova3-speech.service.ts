@@ -55,6 +55,8 @@ export class Nova3SpeechService {
   private trialDeadline = 0;
   private readonly trialStorageKey = 'y7-nova3-live-trial-connections';
   private readonly pageLeave = () => this.cancelRecognition();
+  private usageEventId: string | null = null;
+  private usageCsrf = '';
 
   isListening() { return this.running; }
   trialConnectionsUsed() { return this.readTrialCount() ?? 2; }
@@ -75,6 +77,7 @@ export class Nova3SpeechService {
     if (this.running) return false;
     if (this.boundedTrial && (this.readTrialCount() ?? 2) >= 2) { this.status.set('The two-session trial limit has been reached.'); return false; }
     const generation = ++this.generation;
+    this.usageEventId = crypto.randomUUID(); this.usageCsrf = '';
     this.running = true; this.stopping = false; this.callback = onText;
     this.state = new NovaTranscript(); this.confirmed.set(''); this.provisional.set('');
     this.firstFinalLatencyMs.set(null); this.firstInterimLatencyMs.set(null); this.connectionReadyMs.set(null); this.connectionDurationMs.set(0); this.audioSecondsSent.set(0); this.finalisationDelayMs.set(null); this.connectionErrors.set(0); this.finalSegments.set(0);
@@ -104,6 +107,7 @@ export class Nova3SpeechService {
 
   private async token(): Promise<string> {
     const csrf = await guestCsrf();
+    this.usageCsrf = csrf;
     const response = await fetch('/api/guest/nova3-token', { method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': csrf }, signal: AbortSignal.timeout(8_000) });
     if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('Speech service returned an unexpected page.');
     const data = await response.json() as { accessToken?: string; error?: string };
@@ -238,6 +242,7 @@ export class Nova3SpeechService {
 
   private async finish(generation: number) {
     if (generation !== this.generation) return;
+    this.reportUsage();
     this.generation++;
     this.running = false; this.stopping = false; this.flushResolve?.(); this.flushResolve = null; this.closeResolve?.(); this.closeResolve = null;
     this.audioLevel.set(0);
@@ -251,6 +256,7 @@ export class Nova3SpeechService {
 
   // Use when the question/context changes: in-flight callbacks are invalidated immediately.
   cancelRecognition() {
+    this.reportUsage();
     this.generation++; this.callback = null; this.running = false; this.stopping = false;
     this.audioLevel.set(0);
     this.flushResolve?.(); this.flushResolve = null; this.closeResolve?.(); this.closeResolve = null;
@@ -260,6 +266,16 @@ export class Nova3SpeechService {
     this.stream?.getTracks().forEach((track) => track.stop()); this.stream = null;
     void this.context?.close().catch(() => undefined); this.context = null; this.workletReady = null;
     this.status.set('Stopped');
+  }
+
+  private reportUsage() {
+    const eventId = this.usageEventId;
+    this.usageEventId = null;
+    if (!eventId || !this.usageCsrf || (this.audioSecondsSent() === 0 && this.connectionErrors() === 0)) return;
+    void fetch('/api/guest/usage', { method: 'POST', credentials: 'same-origin', keepalive: true,
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': this.usageCsrf },
+      body: JSON.stringify({ eventId, audioSeconds: Math.min(900, this.audioSecondsSent()), providerErrors: Math.min(10, this.connectionErrors()) }),
+    }).catch(() => undefined);
   }
 
   private disconnectAudioGraph() {

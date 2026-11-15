@@ -2,6 +2,8 @@
 
 **Historical experiment record.** The owner subsequently approved Nova-3 as the normal interview engine; see [current production source status](PRODUCTION_SOURCE_RELEASE_2026-11-13.md). The adult-consented `/?speech-lab` comparison page remains available only in development builds. Its two-session/90-second trial controls are separate from the normal interview. These experimental measurements do not establish a verified accuracy percentage.
 
+**Capacity update, 15 November 2026:** The 40-slot guest ceiling, per-IP quota, 3-per-minute grant limit and 16-per-run grant limit described below were historical experiment settings. Current production candidate removes the cumulative ceilings, permits 20 grants per guest per minute, and uses distributed per-session usage monitoring. The isolated emulator-only two-session live trial guard remains. See `README.md` and the current capacity report for the active architecture.
+
 ## Implementation and boundaries
 
 - The diagnostics enumerate audio inputs after microphone permission, display the active track label where the browser exposes it, and allow an exact device selection for Nova-3. Browser SpeechRecognition chooses its own input. The setup microphone test in `?nova3` now displays **confirmed words**, not only permission status. A user can stop that test before starting the interview.

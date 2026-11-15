@@ -13,7 +13,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   try {
     const result = await issueGuest(req, res);
     if (result.kind === 'closed') return respond(res, 403, { error: 'This classroom run is closed.' });
-    if (result.kind === 'limited') return respond(res, 429, { error: 'Too many interview starts. Please ask your teacher for help.' });
     if (result.kind === 'existing') return respond(res, 200, { csrf: await issueCsrf(req, 'guest') });
     return respond(res, 200, { csrf: result.csrf, expiresAt: result.expiresAt });
   } catch { return safeError(res); }

@@ -207,10 +207,20 @@ export class App {
   async refresh() {
     this.loading.set(true); this.adminMessage.set('');
     try {
-      const response = await fetch('/api/admin/records', { credentials: 'same-origin' });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Records unavailable.');
-      this.runId.set(data.runId); this.records.set(data.records); this.pendingCount.set(data.pendingCount || 0);
+      const all: CompletedRecord[] = []; let pending = 0; let cursor: string | null = null; let activeRun = '';
+      const seen = new Set<string>();
+      do {
+        const response = await fetch(`/api/admin/records${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, { credentials: 'same-origin' });
+        if (!response.headers.get('content-type')?.includes('application/json')) throw new Error('Records service returned an unexpected page.');
+        const data = await response.json() as { error?: string; runId: string; records: CompletedRecord[]; pendingCount: number; nextCursor: string | null };
+        if (!response.ok) throw new Error(data.error || 'Records unavailable.');
+        if (activeRun && data.runId !== activeRun) throw new Error('The classroom run changed. Please refresh.');
+        activeRun = data.runId; all.push(...data.records); pending += data.pendingCount || 0;
+        cursor = data.nextCursor;
+        if (cursor && seen.has(cursor)) throw new Error('Records paging was interrupted. Please refresh.');
+        if (cursor) seen.add(cursor);
+      } while (cursor);
+      this.runId.set(activeRun); this.records.set(all); this.pendingCount.set(pending);
     } catch (error) { this.adminMessage.set(error instanceof Error ? error.message : 'Records unavailable.'); }
     finally { this.loading.set(false); }
   }
