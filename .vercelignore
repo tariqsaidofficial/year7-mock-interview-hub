@@ -1,0 +1,15 @@
+# Deploy only application source and build configuration. Local AI Studio,
+# emulator, cache, environment and QA files must never enter a CLI upload.
+/*
+!.vercelignore
+!.postcssrc.json
+!angular.json
+!api
+!package-lock.json
+!package.json
+!public
+!server
+!src
+!tsconfig.app.json
+!tsconfig.json
+!vercel.json
