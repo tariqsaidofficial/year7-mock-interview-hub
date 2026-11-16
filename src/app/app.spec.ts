@@ -20,12 +20,78 @@ describe('student screen', () => {
     app.answer.setValue('My confirmed answer', { emitEvent: false });
     app.interview.updateAnswer('My confirmed answer');
   }
-  afterEach(() => { vi.unstubAllGlobals(); history.replaceState({}, '', '/'); });
+  function mockDialog() {
+    Object.defineProperty(HTMLDialogElement.prototype, 'showModal', { configurable: true, value: function (this: HTMLDialogElement) { this.open = true; } });
+    Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value: function (this: HTMLDialogElement) { this.open = false; this.dispatchEvent(new Event('close')); } });
+  }
+  afterEach(() => { vi.unstubAllGlobals(); Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal'); Reflect.deleteProperty(HTMLDialogElement.prototype, 'close'); vi.useRealTimers(); history.replaceState({}, '', '/'); });
   it('shows the fixed interview welcome screen and setup action', async () => {
     const fixture = setup();
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Your voice.');
     expect(fixture.nativeElement.textContent).toContain("I'm ready to begin");
+  });
+
+  it('shows the privacy notice only 1500ms after a successful Step 1 transition', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, headers: { get: () => 'application/json' }, json: async () => ({ open: true }) }));
+    mockDialog();
+    const fixture = setup(); const app = fixture.componentInstance;
+    fixture.detectChanges();
+    await app.openSetup(); fixture.detectChanges();
+    expect(app.interview.stage()).toBe('setup');
+    expect(fixture.nativeElement.querySelector('dialog')).toBeNull();
+    await vi.advanceTimersByTimeAsync(1499); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('dialog')).toBeNull();
+    await vi.advanceTimersByTimeAsync(1); fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('dialog')).toHaveLength(1);
+    expect(fixture.nativeElement.querySelector('dialog')?.open).toBe(true);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelectorAll('dialog')).toHaveLength(1);
+    fixture.destroy();
+  });
+
+  it('does not show the notice when the run is closed or availability fails', async () => {
+    vi.useFakeTimers();
+    const response = vi.fn().mockResolvedValueOnce({ ok: true, headers: { get: () => 'application/json' }, json: async () => ({ open: false }) }).mockRejectedValueOnce(new Error('offline'));
+    vi.stubGlobal('fetch', response);
+    const fixture = setup(); const app = fixture.componentInstance;
+    await app.openSetup();
+    await vi.advanceTimersByTimeAsync(1600);
+    expect(app.interview.stage()).toBe('welcome'); expect(app.privacyNoticeOpen()).toBe(false);
+    await app.openSetup();
+    await vi.advanceTimersByTimeAsync(1600);
+    expect(app.interview.stage()).toBe('welcome'); expect(app.privacyNoticeOpen()).toBe(false);
+    fixture.destroy();
+  });
+
+  it('cancels the notice timer when leaving setup and allows deliberate reopening', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, headers: { get: () => 'application/json' }, json: async () => ({ open: true }) }));
+    const fixture = setup(); const app = fixture.componentInstance;
+    await app.openSetup(); app.backToWelcome();
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(app.privacyNoticeOpen()).toBe(false);
+    app.interview.stage.set('setup'); app.reopenPrivacyNotice();
+    expect(app.privacyNoticeOpen()).toBe(true);
+    app.closePrivacyNotice();
+    expect(app.privacyNoticeOpen()).toBe(false);
+    fixture.destroy();
+  });
+
+  it('cancels the pending notice on pagehide and component teardown', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, headers: { get: () => 'application/json' }, json: async () => ({ open: true }) }));
+    const fixture = setup(); const app = fixture.componentInstance;
+    await app.openSetup();
+    window.dispatchEvent(new Event('pagehide'));
+    await vi.advanceTimersByTimeAsync(1600);
+    expect(app.privacyNoticeOpen()).toBe(false);
+    app.backToWelcome();
+    await app.openSetup();
+    fixture.destroy();
+    await vi.advanceTimersByTimeAsync(1600);
+    expect(app.privacyNoticeOpen()).toBe(false);
   });
 
   it('uses Nova-3 for the normal interview without a query flag', () => {

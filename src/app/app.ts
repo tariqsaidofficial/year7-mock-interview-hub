@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, isDevMode, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, isDevMode, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { CATEGORIES, CategoryId, CompletedRecord, QUESTIONS } from './interview.models';
@@ -10,7 +10,8 @@ import { UiIconComponent, IconName } from './ui-icon.component';
 import { SpeechLabComponent } from './experiments/speech-lab.component';
 import { Nova3SpeechService } from './experiments/nova3-speech.service';
 import { VoiceOrbComponent } from './voice-orb/voice-orb.component';
-@Component({ selector: 'app-root', changeDetection: ChangeDetectionStrategy.OnPush, imports: [ReactiveFormsModule, UiIconComponent, SpeechLabComponent, VoiceOrbComponent], templateUrl: './app.html', styleUrls: ['./app.css', './student-v5.css'] })
+import { PrivacyNoticeComponent } from './privacy-notice/privacy-notice.component';
+@Component({ selector: 'app-root', changeDetection: ChangeDetectionStrategy.OnPush, imports: [ReactiveFormsModule, UiIconComponent, SpeechLabComponent, VoiceOrbComponent, PrivacyNoticeComponent], templateUrl: './app.html', styleUrls: ['./app.css', './student-v5.css', './privacy-integration.css'] })
 export class App {
   private readonly destroyRef = inject(DestroyRef);
   readonly speechLab = isDevMode() && typeof location !== 'undefined' && new URLSearchParams(location.search).has('speech-lab');
@@ -48,17 +49,21 @@ export class App {
   readonly admin = signal(typeof window !== 'undefined' && location.pathname === '/admin');
   readonly adminMessage = signal(''); readonly records = signal<CompletedRecord[]>([]); readonly selected = signal<CompletedRecord | null>(null); readonly runId = signal(''); readonly loading = signal(false); readonly signedIn = signal(false); readonly signingIn = signal(false);
   readonly availabilityMessage = signal(''); readonly checkingAvailability = signal(false);
+  readonly privacyNoticeOpen = signal(false);
+  private privacyNoticeTimer: ReturnType<typeof setTimeout> | null = null;
   readonly visibleRecords = computed(() => { const term = this.searchValue().toLowerCase().trim(); return this.records().filter((r) => `${r.studentName} ${r.tutorGroup}`.toLowerCase().includes(term)).sort((a, b) => this.sortValue() === 'name' ? a.studentName.localeCompare(b.studentName) : this.sortValue() === 'group' ? a.tutorGroup.localeCompare(b.tutorGroup) : b.completedAt.localeCompare(a.completedAt)); });
   private recognitionBase = '';
   private speechGeneration = 0;
   private routeGeneration = 0;
   private readonly onHistoryNavigation = () => { void this.handleHistoryNavigation(); };
+  private readonly onPageHide = () => { this.closePrivacyNotice(); this.stopSoundCheck(); this.nova.cancelRecognition(); };
   constructor() {
+    effect(() => { if (this.admin() || this.interview.stage() !== 'setup') this.closePrivacyNotice(); });
     this.answer.valueChanges.subscribe((text) => { if (this.speech.isListening() || this.nova.isCapturePending()) { this.speechGeneration++; void this.speech.stopRecognition(); } else if (this.nova.connectionState() === 'ERROR') this.nova.cancelRecognition(); this.interview.updateAnswer(text); });
     if (this.admin()) void this.checkSession();
     window.addEventListener('popstate', this.onHistoryNavigation);
-    this.destroyRef.onDestroy(() => window.removeEventListener('popstate', this.onHistoryNavigation));
-    window.addEventListener('pagehide', () => { this.stopSoundCheck(); this.nova.cancelRecognition(); });
+    this.destroyRef.onDestroy(() => { window.removeEventListener('popstate', this.onHistoryNavigation); window.removeEventListener('pagehide', this.onPageHide); this.closePrivacyNotice(); });
+    window.addEventListener('pagehide', this.onPageHide);
     document.addEventListener('visibilitychange', () => {
       // Safari briefly hides the document while its microphone permission sheet is open.
       // Keep a pending permission request valid; an active stream is still closed on tab hide.
@@ -69,6 +74,20 @@ export class App {
     });
   }
   private syncAnswer() { this.answer.setValue(this.interview.currentAnswer(), { emitEvent: false }); }
+  private schedulePrivacyNotice(): void {
+    this.closePrivacyNotice();
+    this.privacyNoticeTimer = setTimeout(() => {
+      this.privacyNoticeTimer = null;
+      if (!this.admin() && this.interview.stage() === 'setup') this.privacyNoticeOpen.set(true);
+    }, 1_500);
+  }
+  closePrivacyNotice(): void {
+    if (this.privacyNoticeTimer !== null) clearTimeout(this.privacyNoticeTimer);
+    this.privacyNoticeTimer = null;
+    this.privacyNoticeOpen.set(false);
+  }
+  reopenPrivacyNotice(): void { if (!this.admin() && this.interview.stage() === 'setup') this.privacyNoticeOpen.set(true); }
+  backToWelcome(): void { this.closePrivacyNotice(); this.interview.stage.set('welcome'); }
   private async releaseStudentAudio(): Promise<boolean> {
     this.stopSoundCheck();
     this.audio.stop();
@@ -120,6 +139,7 @@ export class App {
       const data = await response.json() as { open?: boolean };
       if (data.open !== true) { this.availabilityMessage.set('This classroom run is not open yet. Please ask your teacher before starting.'); return; }
       this.interview.showSetup();
+      if (this.interview.stage() === 'setup') this.schedulePrivacyNotice();
     } catch { this.availabilityMessage.set('The classroom status could not be checked. Please connect and try again.'); }
     finally { this.checkingAvailability.set(false); }
   }
@@ -127,6 +147,7 @@ export class App {
     if (this.form.invalid) { this.form.markAllAsTouched(); return; }
     if (this.form.controls.group.value === 'Other' && !/^[A-Za-z0-9 -]{2,30}$/.test(this.otherGroup.value.trim())) { this.groupError.set('Enter a form group using 2–30 letters, numbers, spaces or hyphens.'); return; }
     this.groupError.set('');
+    this.closePrivacyNotice();
     this.interview.stage.set('sound-check');
     await this.startSoundCheck();
   }
@@ -190,6 +211,7 @@ export class App {
   async skip() { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { await this.speech.stopRecognition(); if (this.nova.connectionState() === 'ERROR') this.nova.cancelRecognition(); this.speechGeneration++; this.interview.move(1); this.syncAnswer(); this.clearNovaDisplay(); } finally { this.navigationBusy.set(false); } }
   async next() { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { if (await this.speech.stopRecognition() === false) return; this.speechGeneration++; if (this.interview.index() === this.questions.length - 1) await this.interview.submit(); else this.interview.move(1); this.syncAnswer(); this.clearNovaDisplay(); } finally { this.navigationBusy.set(false); } }
   private resetStudentSession() {
+    this.closePrivacyNotice();
     this.stopSoundCheck();
     this.speechGeneration++;
     if (this.useNova3) this.nova.cancelRecognition();

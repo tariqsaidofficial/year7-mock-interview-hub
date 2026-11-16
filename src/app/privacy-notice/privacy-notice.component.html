@@ -1,0 +1,75 @@
+<dialog
+  #privacyDialog
+  class="privacy-dialog"
+  aria-labelledby="privacy-title"
+  aria-describedby="privacy-description"
+  (cancel)="onCancel($event)"
+  (close)="onDialogClosed()"
+>
+  <div class="privacy-hero" aria-hidden="true">
+    <span class="privacy-hero-glow privacy-hero-glow--left"></span>
+    <span class="privacy-hero-glow privacy-hero-glow--right"></span>
+    <span class="privacy-hero-orbit privacy-hero-orbit--one"></span>
+    <span class="privacy-hero-orbit privacy-hero-orbit--two"></span>
+    <span class="privacy-hero-star privacy-hero-star--left"><app-ui-icon name="sparkles" /></span>
+    <span class="privacy-hero-star privacy-hero-star--right"><app-ui-icon name="sparkles" /></span>
+    <span class="privacy-hero-mini-dot privacy-hero-mini-dot--one"></span>
+    <span class="privacy-hero-mini-dot privacy-hero-mini-dot--two"></span>
+    <svg class="privacy-wave" viewBox="0 0 600 102" preserveAspectRatio="none" focusable="false">
+      <path d="M0 64 C90 64 150 72 202 43 C239 22 258 3 300 3 C342 3 361 22 398 43 C450 72 510 64 600 64 L600 102 L0 102Z" fill="currentColor" />
+    </svg>
+    <span class="privacy-shield-halo">
+      <span class="privacy-shield-icon"><app-ui-icon name="shield" /></span>
+      <span class="privacy-shield-check"></span>
+    </span>
+  </div>
+
+  <div class="privacy-content">
+    <span class="privacy-eyebrow"><app-ui-icon name="sparkles" /> A QUICK NOTE BEFORE WE BEGIN</span>
+    <h2 id="privacy-title">Your Privacy &amp; Safety Matter</h2>
+    <p id="privacy-description" class="privacy-intro">
+      Your voice matters, and so does your privacy.
+    </p>
+    <p class="privacy-copy">
+      This one-time school activity was built using
+      <strong>Google AI Studio and Firebase</strong>.
+      AI follows set instructions to help analyse your answers and prepare feedback.
+    </p>
+    <p class="privacy-copy">
+      Your <strong>first name, last name and form group</strong> help the school
+      identify your answers. Authorised school staff may review them.
+      Please don't share private or sensitive details.
+    </p>
+
+    <div class="privacy-assurances" aria-label="Three useful things to know">
+      <div class="privacy-assurance privacy-assurance--blue">
+        <span class="privacy-assurance-icon" aria-hidden="true"><app-ui-icon name="shield" /></span>
+        <strong>No student account</strong>
+      </div>
+      <div class="privacy-assurance privacy-assurance--teal">
+        <span class="privacy-assurance-icon" aria-hidden="true"><app-ui-icon name="info" /></span>
+        <strong>No public profile</strong>
+      </div>
+      <div class="privacy-assurance privacy-assurance--gold">
+        <span class="privacy-assurance-icon" aria-hidden="true"><app-ui-icon name="clock" /></span>
+        <strong>One-time activity</strong>
+      </div>
+    </div>
+
+    <div class="privacy-actions">
+      <button type="button" class="primary-button privacy-accept" (click)="dismiss()">
+        I understand <app-ui-icon name="arrow" />
+      </button>
+    </div>
+
+    <details class="privacy-more">
+      <summary><app-ui-icon name="info" /> Learn more about your answers</summary>
+      <div class="privacy-more-body">
+        If you choose to speak, Deepgram helps turn speech into text. An AI service
+        accessed through OpenRouter helps analyse written answers and prepare
+        feedback. School staff can review responses. Ask the school if you would
+        like to know how long answers are kept.
+      </div>
+    </details>
+  </div>
+</dialog>

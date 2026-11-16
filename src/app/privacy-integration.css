@@ -1,0 +1,3 @@
+.student-experience .setup-privacy-link{display:inline-flex;align-items:center;gap:7px;margin-top:14px;padding:8px 2px;min-height:44px;border:0;background:none;color:#2b4b98;font:inherit;font-size:13px;font-weight:800;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.student-experience .setup-privacy-link:focus-visible{outline:3px solid #1dadc9;outline-offset:3px}
+@media(max-width:360px){.student-experience .setup-heading h1{font-size:29px}.student-experience .setup-v5,.student-experience .setup-layout,.student-experience .form-card,.student-experience .setup-aside{min-width:0}.student-experience .setup-layout{grid-template-columns:minmax(0,1fr)}}
