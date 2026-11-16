@@ -11,6 +11,16 @@ const MAX_BUFFER_BYTES = 1_048_576;
 const MAX_BUFFER_SECONDS = 8;
 const MAX_SOCKET_BACKLOG = 262_144;
 
+// Guard the actual transport boundary so future query refactors fail closed.
+export function requirePrivateDeepgramListen(url: string): string {
+  const endpoint = new URL(url);
+  if (endpoint.protocol !== 'wss:' || endpoint.hostname !== 'api.deepgram.com' ||
+      endpoint.pathname !== '/v1/listen' || endpoint.searchParams.get('mip_opt_out') !== 'true') {
+    throw new Error('Speech privacy settings unavailable. You can type your answer.');
+  }
+  return url;
+}
+
 @Injectable({ providedIn: 'root' })
 export class Nova3SpeechService {
   readonly status = signal('Stopped');
@@ -296,14 +306,14 @@ export class Nova3SpeechService {
     const token = await this.token();
     if (generation !== this.generation) return;
     if (this.boundedTrial && Date.now() >= this.trialDeadline) throw new Error('Trial time expired.');
-    const query = new URLSearchParams({ model: 'nova-3', language: 'en-GB', interim_results: 'true', punctuate: 'true', smart_format: 'true', encoding: 'linear16', sample_rate: String(this.context?.sampleRate || 48_000) });
+    const query = new URLSearchParams({ model: 'nova-3', language: 'en-GB', interim_results: 'true', punctuate: 'true', smart_format: 'true', encoding: 'linear16', sample_rate: String(this.context?.sampleRate || 48_000), mip_opt_out: 'true' });
     if (this.endpointing !== 'natural') query.set('endpointing', this.endpointing);
     if (this.useSunmarkeKeyterm && !this.boundedTrial) query.append('keyterm', 'Sunmarke');
     if (this.boundedTrial) {
       const count = this.readTrialCount();
       if (count === null || count >= 2 || !this.writeTrialCount(count + 1)) throw new Error('The two-session trial limit has been reached.');
     }
-    const socket = new WebSocket(`wss://api.deepgram.com/v1/listen?${query}`, ['bearer', token]);
+    const socket = new WebSocket(requirePrivateDeepgramListen(`wss://api.deepgram.com/v1/listen?${query}`), ['bearer', token]);
     this.socket = socket;
     return new Promise<void>((resolve, reject) => {
       let opened = false;

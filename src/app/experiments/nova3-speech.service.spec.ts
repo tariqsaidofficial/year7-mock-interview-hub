@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Nova3SpeechService } from './nova3-speech.service';
+import { Nova3SpeechService, requirePrivateDeepgramListen } from './nova3-speech.service';
+
+describe('Deepgram transport privacy boundary', () => {
+  it('rejects a missing or disabled opt-out and a different endpoint', () => {
+    expect(() => requirePrivateDeepgramListen('wss://api.deepgram.com/v1/listen?model=nova-3')).toThrow('Speech privacy settings unavailable');
+    expect(() => requirePrivateDeepgramListen('wss://api.deepgram.com/v1/listen?mip_opt_out=false')).toThrow('Speech privacy settings unavailable');
+    expect(() => requirePrivateDeepgramListen('wss://example.invalid/v1/listen?mip_opt_out=true')).toThrow('Speech privacy settings unavailable');
+    expect(requirePrivateDeepgramListen('wss://api.deepgram.com/v1/listen?mip_opt_out=true')).toContain('mip_opt_out=true');
+  });
+});
 
 describe('bounded adult Nova-3 trial', () => {
   afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); sessionStorage.clear(); });
@@ -40,6 +49,7 @@ describe('bounded adult Nova-3 trial', () => {
     expect(speech.startRecognition(() => undefined)).toBe(true);
     await vi.advanceTimersByTimeAsync(1);
     expect(FakeSocket.sockets).toHaveLength(1); expect(FakeSocket.sockets[0].url).not.toContain('keyterm=');
+    expect(new URL(FakeSocket.sockets[0].url).searchParams.get('mip_opt_out')).toBe('true');
     await vi.advanceTimersByTimeAsync(89_999);
     expect(FakeSocket.sockets[0].readyState).toBe(3);
     expect(speech.status()).toContain('90 seconds');
@@ -109,6 +119,7 @@ describe('Nova-3 finalisation lifecycle', () => {
     const callback = vi.fn(); expect(service.startRecognition(callback)).toBe(true);
     await vi.advanceTimersByTimeAsync(1);
     expect(FakeSocket.latest.url).toContain('sample_rate=48000');
+    expect(new URL(FakeSocket.latest.url).searchParams.get('mip_opt_out')).toBe('true');
     expect(FakeSocket.latest.protocols[0]).toBe('bearer');
     const stopping = service.stopRecognition();
     await vi.advanceTimersByTimeAsync(3_200);

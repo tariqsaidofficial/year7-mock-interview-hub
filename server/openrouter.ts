@@ -6,7 +6,7 @@ export async function evaluate(answers: {questionId: number; text: string}[], on
   if (!key) throw new Error('OpenRouter unavailable');
   if (process.env['OPENROUTER_MODEL'] && process.env['OPENROUTER_MODEL'] !== modelName) throw new Error('Unapproved model configured');
   const content = QUESTIONS.map((q) => ({ id: q.id, categoryId: q.categoryId, question: q.text, answer: answers[q.id - 1]?.text || '' }));
-  const body = { model: modelName, reasoning: { effort: 'medium', exclude: true }, max_completion_tokens: 2400, provider: { require_parameters: true }, response_format: { type: 'json_schema', json_schema: { name: 'year7_feedback', strict: true, schema: responseJsonSchema } }, messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: JSON.stringify(content) }] };
+  const body = { model: modelName, reasoning: { effort: 'medium', exclude: true }, max_completion_tokens: 2400, provider: { require_parameters: true, zdr: true, data_collection: 'deny', allow_fallbacks: false }, response_format: { type: 'json_schema', json_schema: { name: 'year7_feedback', strict: true, schema: responseJsonSchema } }, messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: JSON.stringify(content) }] };
   let lastError: Error | undefined;
   // Leave time for Firestore finalisation within the configured 60-second function limit.
   const providerDeadline = Date.now() + 42_000;
@@ -15,7 +15,7 @@ export async function evaluate(answers: {questionId: number; text: string}[], on
     if (remaining < 5_000) break;
     const started = Date.now();
     try {
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'X-OpenRouter-Cache': 'true' }, body: JSON.stringify(body), signal: AbortSignal.timeout(Math.min(32_000, remaining)) });
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(Math.min(32_000, remaining)) });
       if (!res.ok) {
         if (res.status === 429 || res.status >= 500) throw new Error(`Provider retryable ${res.status}`);
         throw new Error(`Provider rejected ${res.status}`);

@@ -26,7 +26,8 @@ describe('privacy notice', () => {
     expect(root.textContent).toContain('first name, last name and form group');
     expect(root.textContent).toContain('Deepgram');
     expect(root.textContent).toContain('OpenRouter');
-    expect(root.textContent).not.toMatch(/not used to train|never stored|never leaves school/i);
+    expect(root.textContent).toContain('Firebase');
+    expect(root.textContent).not.toMatch(/not used to train|never stored|never leaves school|one-time activity/i);
     fixture.destroy();
   });
 
