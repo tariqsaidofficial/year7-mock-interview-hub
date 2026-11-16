@@ -1,16 +1,26 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './app';
 import { SpeechService } from './speech.service';
 import { Nova3SpeechService } from './experiments/nova3-speech.service';
 import { QuestionAudioService } from './question-audio.service';
+import { loadDraft } from './draft';
 
 describe('student screen', () => {
   function setup() {
-    TestBed.configureTestingModule({ imports: [App], providers: [{ provide: SpeechService, useValue: { status: () => 'Browser fallback unused', recognitionAvailable: () => false, isListening: () => false, stopRecognition: vi.fn() } }, { provide: Nova3SpeechService, useValue: { status: () => 'Stopped', connectionState: () => 'IDLE', recognitionAvailable: () => false, isListening: () => false, isCapturePending: () => false, stopRecognition: vi.fn(), cancelRecognition: vi.fn(), prepareInterview: vi.fn(), provisional: signal(''), confirmed: signal('') } }, { provide: QuestionAudioService, useValue: { message: () => 'Audio unavailable', state: () => 'unavailable', enterQuestion: vi.fn(), stop: vi.fn(), reset: vi.fn() } }] });
+    TestBed.configureTestingModule({ imports: [App], providers: [{ provide: SpeechService, useValue: { status: () => 'Browser fallback unused', recognitionAvailable: () => false, isListening: () => false, stopRecognition: vi.fn() } }, { provide: Nova3SpeechService, useValue: { status: () => 'Stopped', connectionState: vi.fn(() => 'IDLE'), recognitionAvailable: () => false, isListening: vi.fn(() => false), isCapturePending: () => false, stopRecognition: vi.fn(), cancelRecognition: vi.fn(), prepareInterview: vi.fn(), provisional: signal(''), confirmed: signal(''), audioLevel: signal(0) } }, { provide: QuestionAudioService, useValue: { message: () => 'Audio unavailable', state: () => 'unavailable', enterQuestion: vi.fn(), stop: vi.fn(), reset: vi.fn() } }] });
     return TestBed.createComponent(App);
   }
+  function startSyntheticInterview(app: App) {
+    const entries = new Map<string, string>();
+    vi.stubGlobal('localStorage', { getItem: (key: string) => entries.get(key) ?? null, setItem: (key: string, value: string) => { entries.set(key, value); }, removeItem: (key: string) => { entries.delete(key); } });
+    app.interview.stage.set('sound-check');
+    app.interview.start('Synthetic Adult', '7A');
+    app.answer.setValue('My confirmed answer', { emitEvent: false });
+    app.interview.updateAnswer('My confirmed answer');
+  }
+  afterEach(() => { vi.unstubAllGlobals(); history.replaceState({}, '', '/'); });
   it('shows the fixed interview welcome screen and setup action', async () => {
     const fixture = setup();
     fixture.detectChanges();
@@ -26,11 +36,39 @@ describe('student screen', () => {
 
   it('prepares Nova capture at Begin Interview', () => {
     const fixture = setup(); const app = fixture.componentInstance;
-    app.form.setValue({ name: 'Synthetic Student', group: '7A' });
+    app.form.setValue({ firstName: 'Synthetic', lastName: 'Student', group: '7A' });
     app.interview.stage.set('sound-check');
     app.start();
     expect(app.nova.prepareInterview).toHaveBeenCalledOnce();
     expect(app.interview.stage()).toBe('interview');
+    app.finishAndClear();
+  });
+
+  it('shows separate first and last names plus the form group and sends the combined name', async () => {
+    const fixture = setup(); const app = fixture.componentInstance;
+    app.interview.stage.set('setup'); fixture.detectChanges();
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('label[for="first-name"]')?.textContent).toContain('First name');
+    expect(root.querySelector('label[for="last-name"]')?.textContent).toContain('Last name');
+    expect(root.querySelector('label[for="group"]')?.textContent).toContain('Form group');
+    expect(root.querySelector('#first-name')?.getAttribute('autocomplete')).toBe('given-name');
+    expect(root.querySelector('#last-name')?.getAttribute('autocomplete')).toBe('family-name');
+    app.form.setValue({ firstName: '  Synthetic ', lastName: ' Student  ', group: '7A' });
+    app.interview.stage.set('sound-check'); app.start();
+    expect(app.interview.name()).toBe('Synthetic Student');
+    expect(app.interview.group()).toBe('7A');
+    app.finishAndClear();
+  });
+
+  it('requires both nonblank name fields before sound check', async () => {
+    const fixture = setup(); const app = fixture.componentInstance;
+    app.interview.stage.set('setup');
+    app.form.setValue({ firstName: 'Synthetic', lastName: '   ', group: '7A' });
+    await app.continueToSoundCheck();
+    expect(app.interview.stage()).toBe('setup');
+    expect(app.form.controls.lastName.invalid).toBe(true);
+    app.form.controls.lastName.setValue('Student');
+    expect(app.form.valid).toBe(true);
     app.finishAndClear();
   });
 
@@ -69,6 +107,106 @@ describe('student screen', () => {
     expect(app.interview.index()).toBe(1);
     expect(app.nova.stopRecognition).toHaveBeenCalledTimes(1);
     app.finishAndClear();
+  });
+
+  it('finalises active speech before opening teacher login and keeps the confirmed draft', async () => {
+    history.replaceState({}, '', '/');
+    const fixture = setup(); const app = fixture.componentInstance;
+    startSyntheticInterview(app);
+    vi.mocked(app.nova.isListening).mockReturnValue(true);
+    let finish!: (success: boolean) => void;
+    vi.mocked(app.nova.stopRecognition).mockReturnValueOnce(new Promise<boolean>((resolve) => { finish = resolve; }));
+    const navigation = app.openAdmin();
+    expect(app.admin()).toBe(false);
+    expect(app.nova.cancelRecognition).not.toHaveBeenCalled();
+    finish(true); await navigation;
+    expect(app.admin()).toBe(true);
+    expect(app.nova.cancelRecognition).toHaveBeenCalledOnce();
+    expect(app.interview.currentAnswer()).toBe('My confirmed answer');
+    expect(loadDraft()?.answers[0].text).toBe('My confirmed answer');
+    app.finishAndClear(); fixture.destroy(); history.replaceState({}, '', '/');
+  });
+
+  it('blocks teacher navigation on failed finalisation, releases speech, and explains draft recovery', async () => {
+    history.replaceState({}, '', '/');
+    const fixture = setup(); const app = fixture.componentInstance;
+    startSyntheticInterview(app);
+    vi.mocked(app.nova.isListening).mockReturnValue(true);
+    vi.mocked(app.nova.stopRecognition).mockResolvedValueOnce(false);
+    await app.openAdmin(); fixture.detectChanges();
+    expect(app.admin()).toBe(false);
+    expect(location.pathname).toBe('/');
+    expect(app.nova.cancelRecognition).toHaveBeenCalledOnce();
+    expect(app.routeMessage()).toContain('Repeat the missing words or type them');
+    expect((fixture.nativeElement as HTMLElement).querySelector('[role="alert"]')?.textContent).toContain('saved answers');
+    expect(app.interview.currentAnswer()).toBe('My confirmed answer');
+    expect(loadDraft()?.answers[0].text).toBe('My confirmed answer');
+    app.finishAndClear(); fixture.destroy();
+  });
+
+  it('releases a preconnected idle microphone and socket before teacher login', async () => {
+    history.replaceState({}, '', '/');
+    const fixture = setup(); const app = fixture.componentInstance;
+    startSyntheticInterview(app);
+    vi.mocked(app.nova.connectionState).mockReturnValue('READY');
+    await app.openAdmin();
+    expect(app.nova.stopRecognition).not.toHaveBeenCalled();
+    expect(app.nova.cancelRecognition).toHaveBeenCalledOnce();
+    expect(app.admin()).toBe(true);
+    expect(app.interview.currentAnswer()).toBe('My confirmed answer');
+    app.finishAndClear(); fixture.destroy(); history.replaceState({}, '', '/');
+  });
+
+  it('waits for an already finalising answer even after local capture has stopped', async () => {
+    history.replaceState({}, '', '/');
+    const fixture = setup(); const app = fixture.componentInstance;
+    startSyntheticInterview(app);
+    vi.mocked(app.nova.connectionState).mockReturnValue('FINALISING');
+    let finish!: (success: boolean) => void;
+    vi.mocked(app.nova.stopRecognition).mockReturnValueOnce(new Promise<boolean>((resolve) => { finish = resolve; }));
+    const navigation = app.openAdmin();
+    expect(app.admin()).toBe(false);
+    expect(app.nova.cancelRecognition).not.toHaveBeenCalled();
+    finish(true); await navigation;
+    expect(app.admin()).toBe(true);
+    expect(app.nova.cancelRecognition).toHaveBeenCalledOnce();
+    expect(app.interview.currentAnswer()).toBe('My confirmed answer');
+    app.finishAndClear(); fixture.destroy(); history.replaceState({}, '', '/');
+  });
+
+  it('cleans up on browser back and forward before changing the protected view', async () => {
+    history.replaceState({}, '', '/');
+    const fixture = setup(); const app = fixture.componentInstance;
+    startSyntheticInterview(app);
+    vi.mocked(app.nova.isListening).mockReturnValue(true);
+    let finish!: (success: boolean) => void;
+    vi.mocked(app.nova.stopRecognition).mockReturnValueOnce(new Promise<boolean>((resolve) => { finish = resolve; }));
+    history.replaceState({}, '', '/admin'); window.dispatchEvent(new PopStateEvent('popstate'));
+    expect(app.admin()).toBe(false);
+    finish(true);
+    await vi.waitFor(() => expect(app.admin()).toBe(true));
+    expect(app.nova.cancelRecognition).toHaveBeenCalledOnce();
+    vi.mocked(app.nova.isListening).mockReturnValue(false);
+    history.replaceState({}, '', '/'); window.dispatchEvent(new PopStateEvent('popstate'));
+    await vi.waitFor(() => expect(app.admin()).toBe(false));
+    expect(app.nova.cancelRecognition).toHaveBeenCalledTimes(2);
+    expect(app.interview.currentAnswer()).toBe('My confirmed answer');
+    app.finishAndClear(); fixture.destroy();
+  });
+
+  it('restores the student URL when browser history reaches teacher login after failed speech', async () => {
+    history.replaceState({}, '', '/');
+    const fixture = setup(); const app = fixture.componentInstance;
+    startSyntheticInterview(app);
+    vi.mocked(app.nova.isListening).mockReturnValue(true);
+    vi.mocked(app.nova.stopRecognition).mockResolvedValueOnce(false);
+    history.replaceState({}, '', '/admin'); window.dispatchEvent(new PopStateEvent('popstate'));
+    await vi.waitFor(() => expect(location.pathname).toBe('/'));
+    expect(app.admin()).toBe(false);
+    expect(app.nova.cancelRecognition).toHaveBeenCalledOnce();
+    expect(app.routeMessage()).toContain('could not be confirmed');
+    expect(loadDraft()?.answers[0].text).toBe('My confirmed answer');
+    app.finishAndClear(); fixture.destroy();
   });
 
   it('loads every teacher page beyond the former 100-record ceiling', async () => {
@@ -155,13 +293,15 @@ describe('student screen', () => {
 
   it('clears in-memory student details after finishing', () => {
     const fixture = setup(); const app = fixture.componentInstance;
-    app.form.setValue({ name: 'Test Student', group: '7A' });
+    app.form.setValue({ firstName: 'Test', lastName: 'Student', group: '7A' });
+    app.otherGroup.setValue('7G'); app.routeMessage.set('Recovery message');
     app.interview.name.set('Test Student');
     app.interview.group.set('7A');
     app.interview.stage.set('results');
     app.finishAndClear();
     expect(app.interview.stage()).toBe('welcome');
-    expect(app.form.value).toEqual({ name: '', group: '' });
+    expect(app.form.value).toEqual({ firstName: '', lastName: '', group: '' });
+    expect(app.otherGroup.value).toBe(''); expect(app.routeMessage()).toBe('');
     expect(app.interview.name()).toBe('');
     expect(app.interview.group()).toBe('');
     expect(app.audio.reset).toHaveBeenCalled();

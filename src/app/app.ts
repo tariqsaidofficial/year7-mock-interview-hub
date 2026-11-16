@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, isDevMode, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, isDevMode, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { CATEGORIES, CategoryId, CompletedRecord, QUESTIONS } from './interview.models';
@@ -12,6 +12,7 @@ import { Nova3SpeechService } from './experiments/nova3-speech.service';
 import { VoiceOrbComponent } from './voice-orb/voice-orb.component';
 @Component({ selector: 'app-root', changeDetection: ChangeDetectionStrategy.OnPush, imports: [ReactiveFormsModule, UiIconComponent, SpeechLabComponent, VoiceOrbComponent], templateUrl: './app.html', styleUrls: ['./app.css', './student-v5.css'] })
 export class App {
+  private readonly destroyRef = inject(DestroyRef);
   readonly speechLab = isDevMode() && typeof location !== 'undefined' && new URLSearchParams(location.search).has('speech-lab');
   readonly useNova3 = true;
   readonly interview = inject(InterviewService);
@@ -23,7 +24,7 @@ export class App {
   categoryIcon(id: CategoryId): IconName { return ({ transition: 'transition', subjects: 'book', activities: 'activity', leadership: 'leadership' } as const)[id]; }
   readonly categories = CATEGORIES;
   readonly answersText = computed(() => this.interview.answers().map((item) => `Q${item.questionId}: ${item.text || '(No answer)'}`).join('\n\n'));
-  readonly form = new FormGroup({ name: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.minLength(2), Validators.maxLength(80)] }), group: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(30)] }) });
+  readonly form = new FormGroup({ firstName: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.pattern(/\S/), Validators.maxLength(39)] }), lastName: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.pattern(/\S/), Validators.maxLength(39)] }), group: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(30)] }) });
   readonly answer = new FormControl('', { nonNullable: true });
   readonly microphone = new FormControl('', { nonNullable: true });
   readonly otherGroup = new FormControl('', { nonNullable: true });
@@ -37,6 +38,7 @@ export class App {
   private soundCheckGeneration = 0;
   readonly microphoneTestText = signal('');
   readonly navigationBusy = signal(false);
+  readonly routeMessage = signal('');
   readonly adminPassword = new FormControl('', { nonNullable: true });
   readonly search = new FormControl('', { nonNullable: true });
   readonly sort = new FormControl('time', { nonNullable: true });
@@ -49,10 +51,13 @@ export class App {
   readonly visibleRecords = computed(() => { const term = this.searchValue().toLowerCase().trim(); return this.records().filter((r) => `${r.studentName} ${r.tutorGroup}`.toLowerCase().includes(term)).sort((a, b) => this.sortValue() === 'name' ? a.studentName.localeCompare(b.studentName) : this.sortValue() === 'group' ? a.tutorGroup.localeCompare(b.tutorGroup) : b.completedAt.localeCompare(a.completedAt)); });
   private recognitionBase = '';
   private speechGeneration = 0;
+  private routeGeneration = 0;
+  private readonly onHistoryNavigation = () => { void this.handleHistoryNavigation(); };
   constructor() {
     this.answer.valueChanges.subscribe((text) => { if (this.speech.isListening() || this.nova.isCapturePending()) { this.speechGeneration++; void this.speech.stopRecognition(); } else if (this.nova.connectionState() === 'ERROR') this.nova.cancelRecognition(); this.interview.updateAnswer(text); });
     if (this.admin()) void this.checkSession();
-    window.addEventListener('popstate', () => { this.stopSoundCheck(); if (this.speechLab) this.nova.cancelRecognition(); this.admin.set(location.pathname === '/admin'); if (this.admin()) void this.checkSession(); });
+    window.addEventListener('popstate', this.onHistoryNavigation);
+    this.destroyRef.onDestroy(() => window.removeEventListener('popstate', this.onHistoryNavigation));
     window.addEventListener('pagehide', () => { this.stopSoundCheck(); this.nova.cancelRecognition(); });
     document.addEventListener('visibilitychange', () => {
       // Safari briefly hides the document while its microphone permission sheet is open.
@@ -64,7 +69,47 @@ export class App {
     });
   }
   private syncAnswer() { this.answer.setValue(this.interview.currentAnswer(), { emitEvent: false }); }
-  openAdmin() { this.stopSoundCheck(); if (this.speechLab) this.nova.cancelRecognition(); history.pushState({}, '', '/admin'); this.adminMessage.set(''); this.admin.set(true); void this.checkSession(); }
+  private async releaseStudentAudio(): Promise<boolean> {
+    this.stopSoundCheck();
+    this.audio.stop();
+    if (this.interview.stage() === 'interview' && (this.speech.isListening() || this.nova.isCapturePending() || ['RECORDING_LOCAL', 'STREAMING', 'FINALISING', 'RECONNECTING', 'ERROR'].includes(this.nova.connectionState()))) {
+      let finalised = false;
+      try { finalised = await this.speech.stopRecognition() !== false; } catch { /* Treat an interrupted stop as unconfirmed speech. */ }
+      if (!finalised) {
+        this.speechGeneration++;
+        this.nova.cancelRecognition();
+        this.routeMessage.set(this.interview.savedOnDevice()
+          ? 'Some speech could not be confirmed. Your saved answers are still here. Repeat the missing words or type them before opening the teacher area.'
+          : 'Some speech could not be confirmed and this device could not save your draft. Keep this page open and copy or type the missing words before opening the teacher area.');
+        return false;
+      }
+    }
+    this.speechGeneration++;
+    this.nova.cancelRecognition();
+    this.routeMessage.set('');
+    return true;
+  }
+  async openAdmin() {
+    if (this.navigationBusy()) return;
+    const generation = ++this.routeGeneration;
+    this.navigationBusy.set(true);
+    try {
+      if (!await this.releaseStudentAudio() || generation !== this.routeGeneration) return;
+      history.pushState({}, '', '/admin'); this.adminMessage.set(''); this.admin.set(true); void this.checkSession();
+    } finally { if (generation === this.routeGeneration) this.navigationBusy.set(false); }
+  }
+  private async handleHistoryNavigation() {
+    const generation = ++this.routeGeneration;
+    const targetAdmin = location.pathname === '/admin';
+    this.navigationBusy.set(true);
+    try {
+      const safe = await this.releaseStudentAudio();
+      if (generation !== this.routeGeneration) return;
+      if (!safe) { history.replaceState({}, '', '/'); return; }
+      this.admin.set(targetAdmin);
+      if (targetAdmin) void this.checkSession();
+    } finally { if (generation === this.routeGeneration) this.navigationBusy.set(false); }
+  }
   closeAdmin() { if (this.speechLab) this.nova.cancelRecognition(); history.pushState({}, '', '/'); this.admin.set(false); this.adminMessage.set(''); this.adminPassword.setValue(''); this.records.set([]); this.selected.set(null); }
   async openSetup() {
     if (this.checkingAvailability()) return;
@@ -80,7 +125,7 @@ export class App {
   }
   async continueToSoundCheck() {
     if (this.form.invalid) { this.form.markAllAsTouched(); return; }
-    if (this.form.controls.group.value === 'Other' && !/^[A-Za-z0-9 -]{2,30}$/.test(this.otherGroup.value.trim())) { this.groupError.set('Enter a tutor group using 2–30 letters, numbers, spaces or hyphens.'); return; }
+    if (this.form.controls.group.value === 'Other' && !/^[A-Za-z0-9 -]{2,30}$/.test(this.otherGroup.value.trim())) { this.groupError.set('Enter a form group using 2–30 letters, numbers, spaces or hyphens.'); return; }
     this.groupError.set('');
     this.interview.stage.set('sound-check');
     await this.startSoundCheck();
@@ -89,7 +134,7 @@ export class App {
     if (this.form.invalid || (this.form.controls.group.value === 'Other' && !!this.groupError())) { this.form.markAllAsTouched(); return; }
     if (this.useNova3) this.nova.cancelRecognition();
     const preparedStream = this.stopSoundCheck(true);
-    this.interview.start(this.form.controls.name.value, this.form.controls.group.value === 'Other' ? this.otherGroup.value : this.form.controls.group.value);
+    this.interview.start(`${this.form.controls.firstName.value.trim()} ${this.form.controls.lastName.value.trim()}`, this.form.controls.group.value === 'Other' ? this.otherGroup.value : this.form.controls.group.value);
     this.syncAnswer();
     if (this.interview.stage() === 'interview') { this.nova.inputDeviceId = this.microphone.value; this.nova.prepareInterview(preparedStream); }
     else preparedStream?.getTracks().forEach((track) => track.stop());
@@ -149,7 +194,8 @@ export class App {
     this.speechGeneration++;
     if (this.useNova3) this.nova.cancelRecognition();
     this.interview.clear();
-    this.form.reset({ name: '', group: '' });
+    this.form.reset({ firstName: '', lastName: '', group: '' });
+    this.otherGroup.reset(''); this.groupError.set(''); this.routeMessage.set('');
     this.answer.setValue('', { emitEvent: false });
     this.microphone.reset('');
     this.microphoneTestText.set('');

@@ -126,6 +126,18 @@ describe('immediate Nova-3 PCM capture', () => {
     service.cancelRecognition();
   });
 
+  it('closes an idle prepared microphone and WebSocket when the view leaves', async () => {
+    const { service, stream, track, Socket } = harness();
+    service.prepareInterview(stream);
+    await vi.advanceTimersByTimeAsync(0);
+    Socket.instances[0].open();
+    expect(service.connectionState()).toBe('READY');
+    service.cancelRecognition();
+    expect(track.stop).toHaveBeenCalledOnce();
+    expect(Socket.instances[0].readyState).toBe(Socket.CLOSED);
+    expect(service.isListening()).toBe(false);
+  });
+
   it('measures connection readiness from preparation even when Speak happens later', async () => {
     const { service, stream, Socket } = harness();
     service.prepareInterview(stream);
