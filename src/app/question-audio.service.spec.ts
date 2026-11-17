@@ -17,8 +17,7 @@ describe('static question audio', () => {
   afterEach(() => { vi.unstubAllGlobals(); FakeAudio.instances = []; FakeAudio.failWith = null; });
 
   it('maps exactly ten approved question files', () => {
-    expect(questionAudioPath(1)).toBe('/audio/questions/q01.mp3');
-    expect(questionAudioPath(10)).toBe('/audio/questions/q10.mp3');
+    expect(Array.from({ length: 10 }, (_, i) => questionAudioPath(i + 1))).toEqual(Array.from({ length: 10 }, (_, i) => `/audio/questions/q${String(i + 1).padStart(2, '0')}.mp3`));
     expect(() => questionAudioPath(11)).toThrow();
   });
 

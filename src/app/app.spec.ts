@@ -30,6 +30,15 @@ describe('student screen', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.textContent).toContain('Your voice.');
     expect(fixture.nativeElement.textContent).toContain("I'm ready to begin");
+    expect(Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.experience-card h3')).map((item) => item.textContent?.trim())).toEqual(['Transition & Adjustment', 'Learning & Curiosity', 'Relationships & Leadership', 'Growth & Aspirations']);
+  });
+
+  it('keeps historic teacher questions and category labels beside their original answers', () => {
+    const app = setup().componentInstance;
+    const oldRecord = { id: 'old', runId: 'test', studentName: 'Synthetic Student', tutorGroup: '7A', completedAt: '2026-11-15', answers: [{ questionId: 2, text: 'My old answer' }], evaluation: { categories: [], whatWentWell: [], evenBetterIf: '', overallSummary: '', formattedCopyableText: '' } };
+    expect(app.recordQuestionText(oldRecord, 2)).toBe('What helps you stay organised during the school day?');
+    expect(app.categoryTitle('subjects', undefined)).toBe('Favourite Subjects');
+    expect(app.categoryTitle('learning', 2)).toBe('Learning & Curiosity');
   });
 
   it('shows the privacy notice only 1500ms after a successful Step 1 transition', async () => {

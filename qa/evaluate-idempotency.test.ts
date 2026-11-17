@@ -23,6 +23,8 @@ describe('submission idempotency', () => {
     const second = response(); await handler(request, second.res);
     expect(first.state.status).toBe(200); expect(second.state.status).toBe(200);
     expect(mocks.evaluate).toHaveBeenCalledTimes(1);
+    expect(mocks.docs.get('student-1')?.['rubricVersion']).toBe(2);
+    expect((mocks.docs.get('student-1')?.['evaluation'] as { rubricVersion?: number }).rubricVersion).toBe(2);
   });
   it('rejects a changed request after completion', async () => {
     const { default: handler } = await import('../api/evaluate');
@@ -30,6 +32,20 @@ describe('submission idempotency', () => {
     const first = response(); await handler({ method: 'POST', headers: {}, body } as ApiRequest, first.res);
     const second = response(); await handler({ method: 'POST', headers: {}, body: { ...body, requestId: crypto.randomUUID() } } as ApiRequest, second.res);
     expect(second.state.status).toBe(409); expect(mocks.evaluate).toHaveBeenCalledTimes(1);
+  });
+  it('does not re-evaluate an unfinished legacy submission under rubric V2', async () => {
+    const { default: handler } = await import('../api/evaluate');
+    const body = { requestId: crypto.randomUUID(), studentName: 'Synthetic Student', tutorGroup: '7A', answers: QUESTIONS.map((q) => ({ questionId: q.id, text: '' })) };
+    const req = { method: 'POST', headers: {}, body } as ApiRequest;
+    const first = response(); await handler(req, first.res);
+    expect(first.state.status).toBe(200);
+    const saved = mocks.docs.get('student-1')!;
+    mocks.docs.set('student-1', { ...saved, status: 'failed', rubricVersion: 1 });
+    mocks.evaluate.mockClear();
+    const retry = response(); await handler(req, retry.res);
+    expect(retry.state.status).toBe(409);
+    expect(mocks.evaluate).not.toHaveBeenCalled();
+    expect(mocks.docs.get('student-1')?.['answers']).toEqual(body.answers);
   });
   it('accepts 30 independent synthetic students concurrently without shared IP throttling', async () => {
     const { default: handler } = await import('../api/evaluate');

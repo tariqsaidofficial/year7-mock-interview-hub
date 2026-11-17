@@ -1,11 +1,11 @@
 import { Injectable, InjectionToken, computed, inject, signal } from '@angular/core';
-import { Answer, Evaluation, QUESTIONS } from './interview.models';
+import { Answer, Evaluation, LEGACY_QUESTION_TEXT, QUESTIONS } from './interview.models';
 import { clearDraft, Draft, loadDraft, saveDraft } from './draft';
 import { clearResult, loadResult, saveResult } from './result-store';
 import { guestCsrf } from './session';
 import { Nova3SpeechService } from './experiments/nova3-speech.service';
 import { QuestionAudioService } from './question-audio.service';
-export type Stage = 'welcome' | 'setup' | 'sound-check' | 'resume-draft' | 'interview' | 'evaluating' | 'offline-pending' | 'evaluation-error' | 'results';
+export type Stage = 'welcome' | 'setup' | 'sound-check' | 'resume-draft' | 'legacy-draft' | 'interview' | 'evaluating' | 'offline-pending' | 'evaluation-error' | 'results';
 const RECOMMENDED_SECONDS = 8 * 60;
 export const STUDENT_CSRF = new InjectionToken<() => Promise<string>>('guest session csrf', { providedIn: 'root', factory: () => guestCsrf });
 @Injectable({ providedIn: 'root' })
@@ -26,6 +26,7 @@ export class InterviewService {
   readonly copyMessage = signal('');
   readonly savedOnDevice = signal(true);
   readonly resultSaved = signal(true);
+  readonly legacyDraft = signal(false);
   readonly currentQuestion = computed(() => QUESTIONS[this.index()]);
   readonly currentAnswer = computed(() => this.answers()[this.index()]?.text || '');
   readonly timeText = computed(() => { const s = this.remainingSeconds(); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; });
@@ -40,9 +41,10 @@ export class InterviewService {
     const draft = loadDraft();
     if (draft) {
       this.restore(draft);
+      this.legacyDraft.set(draft.questionSetVersion !== 2);
       const recovered = loadResult(draft.id);
       if (recovered) { this.evaluation.set(recovered); this.stage.set('results'); }
-      else this.stage.set('resume-draft');
+      else this.stage.set(this.legacyDraft() ? 'legacy-draft' : 'resume-draft');
     } else clearResult();
     window.addEventListener('online', () => { this.online.set(true); if (this.stage() === 'offline-pending') void this.submit(); });
     window.addEventListener('offline', () => { this.online.set(false); void this.speech.stopRecognition(); });
@@ -55,7 +57,7 @@ export class InterviewService {
     this.name.set(name.trim()); this.group.set(group.trim());
     this.id = crypto.randomUUID(); this.startedAt.set(Date.now()); this.elapsedSeconds.set(0);
     this.index.set(0); this.answers.set(QUESTIONS.map((q) => ({ questionId: q.id, text: '' })));
-    this.stage.set('interview'); this.save(); this.startTicker(); this.audio.enterQuestion(QUESTIONS[0].id);
+    this.legacyDraft.set(false); this.stage.set('interview'); this.save(); this.startTicker(); this.audio.enterQuestion(QUESTIONS[0].id);
   }
   resume() {
     if (this.stage() !== 'resume-draft') return;
@@ -69,7 +71,7 @@ export class InterviewService {
   }
   private save() {
     if (!this.id) return;
-    this.savedOnDevice.set(saveDraft({ version: 2, id: this.id, name: this.name(), group: this.group(), answers: this.answers(), index: this.index(), startedAt: this.startedAt(), updatedAt: Date.now() }));
+    this.savedOnDevice.set(saveDraft({ version: 2, questionSetVersion: 2, id: this.id, name: this.name(), group: this.group(), answers: this.answers(), index: this.index(), startedAt: this.startedAt(), updatedAt: Date.now() }));
     if (!this.savedOnDevice()) this.message.set('This device could not save your draft. Copy your answers before leaving.');
   }
   private startTicker() { clearInterval(this.tickHandle); this.tick(); this.tickHandle = setInterval(() => this.tick(), 500); }
@@ -126,13 +128,13 @@ export class InterviewService {
     catch { this.copyMessage.set('Copy did not work. Select the feedback text below to copy it.'); }
   }
   async copyAnswers() {
-    const text = this.answers().map((a, i) => `Q${a.questionId}: ${QUESTIONS[i].text}\n${a.text || '(No answer)'}`).join('\n\n');
+    const text = this.answers().map((a, i) => `Q${a.questionId}: ${this.legacyDraft() ? LEGACY_QUESTION_TEXT[i] : QUESTIONS[i].text}\n${a.text || '(No answer)'}`).join('\n\n');
     try { await navigator.clipboard.writeText(text); this.copyMessage.set('Answers copied.'); }
     catch { this.copyMessage.set('Copy did not work. Select the answers below to copy them.'); }
   }
   clear() {
     this.speech.cancelRecognition(); this.audio.reset(); clearInterval(this.tickHandle); clearDraft(); clearResult();
     this.id = ''; this.name.set(''); this.group.set(''); this.answers.set(QUESTIONS.map((q) => ({ questionId: q.id, text: '' })));
-    this.startedAt.set(0); this.elapsedSeconds.set(0); this.evaluation.set(null); this.message.set(''); this.copyMessage.set(''); this.resultSaved.set(true); this.stage.set('welcome');
+    this.startedAt.set(0); this.elapsedSeconds.set(0); this.evaluation.set(null); this.message.set(''); this.copyMessage.set(''); this.resultSaved.set(true); this.legacyDraft.set(false); this.stage.set('welcome');
   }
 }

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, isDevMode, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { CATEGORIES, CategoryId, CompletedRecord, QUESTIONS } from './interview.models';
+import { CATEGORIES, CategoryId, CompletedRecord, FeedbackCategoryId, LEGACY_QUESTION_TEXT, QUESTIONS, RUBRIC_VERSION, categoryTitle } from './interview.models';
 import { InterviewService } from './interview.service';
 import { SpeechService } from './speech.service';
 import { adminCsrf } from './session';
@@ -21,10 +21,12 @@ export class App {
   readonly nova = inject(Nova3SpeechService);
   readonly audio = inject(QuestionAudioService);
   readonly questions = QUESTIONS;
-  categoryTitle(id: CategoryId) { return CATEGORIES.find((c) => c.id === id)?.title || id; }
-  categoryIcon(id: CategoryId): IconName { return ({ transition: 'transition', subjects: 'book', activities: 'activity', leadership: 'leadership' } as const)[id]; }
+  readonly rubricVersion = RUBRIC_VERSION;
+  categoryTitle(id: FeedbackCategoryId, rubricVersion?: number) { return categoryTitle(id, rubricVersion); }
+  recordQuestionText(record: CompletedRecord, id: number) { return (record.rubricVersion === RUBRIC_VERSION ? QUESTIONS.map((q) => q.text) : LEGACY_QUESTION_TEXT)[id - 1] || ''; }
+  categoryIcon(id: CategoryId): IconName { return ({ transition: 'transition', learning: 'book', relationships: 'leadership', growth: 'activity' } as const)[id]; }
   readonly categories = CATEGORIES;
-  readonly answersText = computed(() => this.interview.answers().map((item) => `Q${item.questionId}: ${item.text || '(No answer)'}`).join('\n\n'));
+  readonly answersText = computed(() => this.interview.answers().map((item, i) => `Q${item.questionId}: ${this.interview.legacyDraft() ? LEGACY_QUESTION_TEXT[i] : QUESTIONS[i].text}\n${item.text || '(No answer)'}`).join('\n\n'));
   readonly form = new FormGroup({ firstName: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.pattern(/\S/), Validators.maxLength(39)] }), lastName: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.pattern(/\S/), Validators.maxLength(39)] }), group: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(30)] }) });
   readonly answer = new FormControl('', { nonNullable: true });
   readonly microphone = new FormControl('', { nonNullable: true });

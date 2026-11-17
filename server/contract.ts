@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CATEGORIES, QUESTIONS, Evaluation } from '../src/app/interview.models';
+import { CATEGORIES, QUESTIONS, Evaluation, RUBRIC_VERSION } from '../src/app/interview.models';
 export const modelName = 'anthropic/claude-haiku-5.5';
 export const submissionSchema = z.strictObject({
   requestId: z.string().uuid(),
@@ -10,7 +10,7 @@ export const submissionSchema = z.strictObject({
 const indicator = z.enum(['Strong evidence', 'Some evidence', 'Not enough evidence']);
 export const modelSchema = z.strictObject({
   categories: z.array(z.strictObject({
-    categoryId: z.enum(['transition', 'subjects', 'activities', 'leadership']),
+    categoryId: z.enum(['transition', 'learning', 'relationships', 'growth']),
     indicator,
     evidence: z.string().trim().min(4).max(280),
     nextStep: z.string().trim().min(4).max(280),
@@ -33,7 +33,7 @@ export function validateEvaluation(raw: unknown, answers: {questionId: number; t
   if (words < 65 || words > 140) throw new Error('Summary length outside acceptable range');
   const forbidden = /\b(?:\d{1,3}%|greater depth|secure standard|developing standard|working towards)\b/i;
   if ([...output.categories.flatMap((c) => [c.evidence, c.nextStep]), ...output.whatWentWell, output.evenBetterIf, output.overallSummary].some((x) => forbidden.test(x))) throw new Error('Unapproved grade or percentage');
-  return { ...output, formattedCopyableText: formatFeedback(output) };
+  return { ...output, rubricVersion: RUBRIC_VERSION, formattedCopyableText: formatFeedback(output) };
 }
 export function formatFeedback(value: ModelOutput): string {
   return [

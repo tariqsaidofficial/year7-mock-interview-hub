@@ -9,6 +9,7 @@ export interface Draft {
   index: number;
   startedAt: number;
   updatedAt: number;
+  questionSetVersion?: 2;
 }
 
 interface LegacyDraft extends Omit<Draft, 'version' | 'startedAt'> {
@@ -36,7 +37,7 @@ export function loadDraft(now = Date.now()): Draft | null {
     ) { clearDraft(); return null; }
     const startedAt = draft.version === 1 ? draft.deadline - RECOMMENDED_MS : draft.startedAt;
     if (!Number.isFinite(startedAt) || startedAt > now + 60_000) { clearDraft(); return null; }
-    return { version: 2, id: draft.id, name: draft.name, group: draft.group, answers: draft.answers, index: draft.index, startedAt, updatedAt: draft.updatedAt };
+    return { version: 2, id: draft.id, name: draft.name, group: draft.group, answers: draft.answers, index: draft.index, startedAt, updatedAt: draft.updatedAt, questionSetVersion: draft.questionSetVersion };
   } catch { return null; }
 }
 

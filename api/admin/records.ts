@@ -19,7 +19,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const snapshot = await query.get();
     const page = snapshot.docs.slice(0, 50);
     const pendingCount = page.filter((doc) => doc.get('status') === 'processing' || doc.get('status') === 'failed').length;
-    const completed = page.filter((doc) => doc.get('status') === 'complete').map((doc) => ({ id: doc.id, runId: doc.get('runId'), studentName: doc.get('studentName'), tutorGroup: doc.get('tutorGroup'), completedAt: doc.get('completedAt'), answers: doc.get('answers'), evaluation: doc.get('evaluation') }));
+    const completed = page.filter((doc) => doc.get('status') === 'complete').map((doc) => ({ id: doc.id, runId: doc.get('runId'), studentName: doc.get('studentName'), tutorGroup: doc.get('tutorGroup'), completedAt: doc.get('completedAt'), answers: doc.get('answers'), evaluation: doc.get('evaluation'), rubricVersion: doc.get('rubricVersion') }));
     return respond(res, 200, { runId: runId(), records: completed, pendingCount, nextCursor: snapshot.docs.length > 50 ? page.at(-1)?.id : null });
   } catch { return safeError(res); }
 }

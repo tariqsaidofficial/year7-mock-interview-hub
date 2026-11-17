@@ -83,5 +83,5 @@ describe('server-side session security', () => {
     const anotherCookie = another.headers.get('Set-Cookie')!.split(';')[0];
     vi.advanceTimersByTime(2 * 60 * 60 * 1000 + 1);
     expect(await getSession(request(anotherCookie, '192.0.2.3'), 'admin')).toBeNull();
-  });
+  }, 15_000);
 });

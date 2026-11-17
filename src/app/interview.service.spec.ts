@@ -84,7 +84,7 @@ describe('supportive interview timing', () => {
 
   it('restores a draft with its original countdown and answer', () => {
     const startedAt = Date.now() - 60_000;
-    saveDraft({ version: 2, id: crypto.randomUUID(), name: 'Example Student', group: '7A', answers: QUESTIONS.map((q) => ({ questionId: q.id, text: q.id === 3 ? 'My saved answer.' : '' })), index: 2, startedAt, updatedAt: Date.now() });
+    saveDraft({ version: 2, questionSetVersion: 2, id: crypto.randomUUID(), name: 'Example Student', group: '7A', answers: QUESTIONS.map((q) => ({ questionId: q.id, text: q.id === 3 ? 'My saved answer.' : '' })), index: 2, startedAt, updatedAt: Date.now() });
     const { interview } = service();
     expect(interview.stage()).toBe('resume-draft');
     expect(interview.timeText()).toBe('07:00');
@@ -94,6 +94,21 @@ describe('supportive interview timing', () => {
     expect(interview.timeText()).toBe('06:59');
     expect(interview.currentAnswer()).toBe('My saved answer.');
     interview.clear(); vi.useRealTimers();
+  });
+
+  it('keeps an earlier question-set draft copyable without resuming it as V2', async () => {
+    const startedAt = Date.now() - 60_000;
+    saveDraft({ version: 2, id: crypto.randomUUID(), name: 'Example Student', group: '7A', answers: [{ questionId: 2, text: 'My earlier answer.' }], index: 1, startedAt, updatedAt: Date.now() });
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText }, onLine: true });
+    const { interview } = service();
+    expect(interview.stage()).toBe('legacy-draft');
+    interview.resume();
+    expect(interview.stage()).toBe('legacy-draft');
+    await interview.copyAnswers();
+    expect(writeText.mock.calls[0][0]).toContain('What helps you stay organised during the school day?');
+    expect(writeText.mock.calls[0][0]).toContain('My earlier answer.');
+    interview.clear();
   });
 
   it('keeps validated feedback through refresh and clears it only on explicit finish', async () => {

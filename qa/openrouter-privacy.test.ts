@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { evaluate } from '../server/openrouter';
+import { SYSTEM_PROMPT, evaluate } from '../server/openrouter';
 import { QUESTIONS } from '../src/app/interview.models';
 
 describe('OpenRouter student data boundary', () => {
@@ -19,6 +19,11 @@ describe('OpenRouter student data boundary', () => {
     expect(payload.provider).toEqual({ require_parameters: true, zdr: true, data_collection: 'deny', allow_fallbacks: false });
     expect(payload.messages).toHaveLength(2);
     expect(JSON.parse(payload.messages[1].content)).toHaveLength(10);
+    expect(payload.messages[0].content).toBe(SYSTEM_PROMPT);
+    expect(SYSTEM_PROMPT).toContain('Learning & Curiosity (Q3, Q9)');
+    expect(SYSTEM_PROMPT).toContain('Relationships & Leadership (Q4, Q5)');
+    expect(SYSTEM_PROMPT).toContain('Growth & Aspirations (Q6, Q7, Q8, Q10)');
+    expect(JSON.parse(payload.messages[1].content).map((item: { categoryId: string }) => item.categoryId)).toEqual(QUESTIONS.map((q) => q.categoryId));
     expect(JSON.stringify(payload)).not.toMatch(/studentName|tutorGroup|formGroup|Synthetic Student/);
     expect(init.headers).not.toHaveProperty('X-OpenRouter-Cache');
   });
