@@ -31,6 +31,19 @@ describe('privacy notice', () => {
     fixture.destroy();
   });
 
+  it('states the synthetic preview data flow without presenting the live school workflow as active', () => {
+    TestBed.configureTestingModule({ imports: [PrivacyNoticeComponent] });
+    const fixture = TestBed.createComponent(PrivacyNoticeComponent);
+    fixture.componentRef.setInput('demo', true);
+    fixture.detectChanges();
+    const copy = (fixture.nativeElement as HTMLElement).textContent || '';
+    expect(copy).toContain('DEMO: This preview uses a fictional identity');
+    expect(copy).toContain('does not open a microphone');
+    expect(copy).toContain('does not contact Deepgram, OpenRouter or Firestore');
+    expect(copy).not.toContain('Authorised school staff may review them');
+    fixture.destroy();
+  });
+
   it('closes on I understand and returns focus to the opener', async () => {
     const opener = document.createElement('button');
     document.body.append(opener); opener.focus();

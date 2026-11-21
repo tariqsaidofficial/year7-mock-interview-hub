@@ -61,6 +61,9 @@ describe('student screen', () => {
     expect(app.interview.currentQuestion().id).toBe(10);
     await app.interview.submit();
     expect(app.interview.stage()).toBe('results');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Fixed fictional feedback shows this screen');
+    expect(fixture.nativeElement.textContent).not.toContain('Your reflection is built around what you shared');
     expect(requests.map((request) => request.url)).toEqual(['/api/guest/availability', '/api/evaluate']);
     expect(requests[1].init?.body).toBe('{"demo":true}');
     expect(localStorage.getItem('year7-interview-draft-v1')).toBeNull();

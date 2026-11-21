@@ -30,15 +30,20 @@
     <p id="privacy-description" class="privacy-intro">
       Your voice matters, and so does your privacy.
     </p>
-    <p class="privacy-copy">
-      This school activity uses <strong>Firebase</strong> to keep interview records for authorised school staff.
-      AI follows set instructions to help analyse your answers and prepare feedback.
-    </p>
-    <p class="privacy-copy">
-      Your <strong>first name, last name and form group</strong> help the school
-      identify your answers. Authorised school staff may review them.
-      Please don't share private or sensitive details.
-    </p>
+    @if (demo()) {
+      <p class="privacy-copy">DEMO: This preview uses a fictional identity and fixed synthetic feedback. It does not open a microphone, send answers to AI services or save interview records.</p>
+      <p class="privacy-copy">Your typed answers stay in this browser tab for this demo. Please do not enter real names or sensitive details.</p>
+    } @else {
+      <p class="privacy-copy">
+        This school activity uses <strong>Firebase</strong> to keep interview records for authorised school staff.
+        AI follows set instructions to help analyse your answers and prepare feedback.
+      </p>
+      <p class="privacy-copy">
+        Your <strong>first name, last name and form group</strong> help the school
+        identify your answers. Authorised school staff may review them.
+        Please don't share private or sensitive details.
+      </p>
+    }
 
     <div class="privacy-assurances" aria-label="Three useful things to know">
       <div class="privacy-assurance privacy-assurance--blue">
@@ -64,10 +69,14 @@
     <details class="privacy-more">
       <summary><app-ui-icon name="info" /> Learn more about your answers</summary>
       <div class="privacy-more-body">
-        If you choose to speak, Deepgram helps turn speech into text. An AI service
-        accessed through OpenRouter helps analyse written answers and prepare
-        feedback. School staff can review responses. Ask the school if you would
-        like to know how long answers are kept.
+        @if (demo()) {
+          This synthetic preview does not contact Deepgram, OpenRouter or Firestore. It shows fixed example feedback so you can explore the interview screens.
+        } @else {
+          If you choose to speak, Deepgram helps turn speech into text. An AI service
+          accessed through OpenRouter helps analyse written answers and prepare
+          feedback. School staff can review responses. Ask the school if you would
+          like to know how long answers are kept.
+        }
       </div>
     </details>
   </div>

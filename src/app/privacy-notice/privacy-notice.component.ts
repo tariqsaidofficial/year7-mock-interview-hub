@@ -2,6 +2,7 @@ import {
   AfterViewInit,
   Component,
   ElementRef,
+  input,
   OnDestroy,
   ViewChild,
   output,
@@ -21,6 +22,7 @@ import { UiIconComponent } from '../ui-icon.component';
   styleUrl: './privacy-notice.component.css',
 })
 export class PrivacyNoticeComponent implements AfterViewInit, OnDestroy {
+  readonly demo = input(false);
   @ViewChild('privacyDialog', { static: true })
   private readonly privacyDialog!: ElementRef<HTMLDialogElement>;
 
