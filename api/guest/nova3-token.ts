@@ -2,9 +2,11 @@ import { ApiRequest, ApiResponse, respond, safeError } from '../../server/http';
 import { db, runId } from '../../server/firebase-admin';
 import { getSession, validCsrf } from '../../server/session';
 import { recordUsage, reserveSpeechGrant } from '../../server/usage';
+import { previewDemoEnabled } from '../../server/preview-demo';
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') return respond(res, 405, { error: 'Method not allowed' });
+  if (previewDemoEnabled()) return respond(res, 403, { error: 'Microphone streaming is unavailable in the synthetic preview.' });
   try {
     const liveTrial = process.env['DEEPGRAM_LIVE_TRIAL'] === 'true';
     if (liveTrial && !process.env['FIRESTORE_EMULATOR_HOST']) return respond(res, 503, { error: 'The bounded speech trial requires the local Firestore emulator.' });

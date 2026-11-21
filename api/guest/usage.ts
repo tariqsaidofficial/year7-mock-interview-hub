@@ -1,3 +1,4 @@
+import { previewDemoEnabled } from '../../server/preview-demo';
 import { FieldValue } from 'firebase-admin/firestore';
 import { db, runId } from '../../server/firebase-admin';
 import { ApiRequest, ApiResponse, jsonBody, respond, safeError } from '../../server/http';
@@ -7,6 +8,7 @@ import { usageRef } from '../../server/usage';
 // Browser telemetry is an estimate, never an authorisation or billing source.
 // Event IDs make retries harmless; neither audio nor transcript text is accepted.
 export default async function handler(req: ApiRequest, res: ApiResponse) {
+  if (previewDemoEnabled()) return respond(res, 403, { error: 'This endpoint is unavailable in the synthetic preview.' });
   if (req.method !== 'POST') return respond(res, 405, { error: 'Method not allowed' });
   try {
     const session = await getSession(req, 'guest');

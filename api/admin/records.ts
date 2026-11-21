@@ -1,7 +1,9 @@
+import { previewDemoEnabled } from '../../server/preview-demo';
 import { recordsCollection, runId } from '../../server/firebase-admin';
 import { getSession } from '../../server/session';
 import { ApiRequest, ApiResponse, respond, safeError } from '../../server/http';
 export default async function handler(req: ApiRequest, res: ApiResponse) {
+  if (previewDemoEnabled()) return respond(res, 403, { error: 'This endpoint is unavailable in the synthetic preview.' });
   if (req.method !== 'GET') return respond(res, 405, { error: 'Method not allowed' });
   let session;
   try { session = await getSession(req, 'admin'); } catch { return safeError(res); }

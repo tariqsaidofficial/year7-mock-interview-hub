@@ -7,9 +7,17 @@ import { ApiRequest, ApiResponse, jsonBody, respond, safeError } from '../server
 import { FieldValue } from 'firebase-admin/firestore';
 import { usageRef } from '../server/usage';
 import { RUBRIC_VERSION } from '../src/app/interview.models';
+import { previewDemoEnabled, syntheticEvaluation } from '../server/preview-demo';
 
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method !== 'POST') return respond(res, 405, { error: 'Method not allowed' });
+  if (previewDemoEnabled()) {
+    let body: unknown;
+    if (Number(req.headers['content-length'] || 0) > 32) return respond(res, 400, { error: 'Synthetic demo requests only.' });
+    try { body = jsonBody(req); } catch { return respond(res, 400, { error: 'Synthetic demo requests only.' }); }
+    if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 1 || (body as { demo?: unknown }).demo !== true || Buffer.byteLength(JSON.stringify(body), 'utf8') > 32) return respond(res, 400, { error: 'Synthetic demo requests only.' });
+    return respond(res, 200, { evaluation: syntheticEvaluation(), demo: true });
+  }
   if (process.env['INTERVIEW_RUN_OPEN'] !== 'true') return respond(res, 403, { error: 'This classroom run is closed.' });
   let session;
   try { session = await getSession(req, 'guest'); } catch { return safeError(res); }

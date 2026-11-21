@@ -1,6 +1,8 @@
 import { ApiRequest, ApiResponse, respond, safeError } from '../../server/http';
 import { getSession, issueCsrf, issueGuest, sameOrigin } from '../../server/session';
+import { previewDemoEnabled } from '../../server/preview-demo';
 export default async function handler(req: ApiRequest, res: ApiResponse) {
+  if (previewDemoEnabled()) return respond(res, 403, { error: 'Guest sessions are unavailable in the synthetic preview.' });
   if (req.method === 'GET') {
     try {
       const session = await getSession(req, 'guest');

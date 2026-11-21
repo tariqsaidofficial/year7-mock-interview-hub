@@ -12,7 +12,7 @@
     "test": "ng test",
     "lint": "ng lint",
     "typecheck": "ngc -p tsconfig.app.json --noEmit",
-    "test:server": "vitest run qa/contract.test.ts qa/question-content-audio.test.ts qa/draft.test.ts qa/api-auth.test.ts qa/teacher-auth.test.ts qa/evaluate-idempotency.test.ts qa/session-security.test.ts qa/firebase-admin-adc.test.ts qa/firebase-admin-wif.test.ts qa/firebase-admin-wif-firestore.test.ts qa/nova3-token.test.ts qa/usage.test.ts qa/openrouter-privacy.test.ts --environment node",
+    "test:server": "vitest run qa/contract.test.ts qa/question-content-audio.test.ts qa/draft.test.ts qa/api-auth.test.ts qa/teacher-auth.test.ts qa/evaluate-idempotency.test.ts qa/session-security.test.ts qa/firebase-admin-adc.test.ts qa/firebase-admin-wif.test.ts qa/firebase-admin-wif-firestore.test.ts qa/nova3-token.test.ts qa/usage.test.ts qa/openrouter-privacy.test.ts qa/preview-demo.test.ts --environment node",
     "typecheck:server": "tsc --noEmit --target ES2022 --module node16 --moduleResolution node16 --strict --skipLibCheck server/*.ts api/*.ts api/admin/*.ts api/guest/*.ts"
   },
   "private": true,

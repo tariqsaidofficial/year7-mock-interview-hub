@@ -12,6 +12,7 @@ export const STUDENT_CSRF = new InjectionToken<() => Promise<string>>('guest ses
 export class InterviewService {
   readonly questions = QUESTIONS;
   readonly stage = signal<Stage>('welcome');
+  readonly demoMode = signal(false);
   readonly name = signal(''); readonly group = signal('');
   readonly index = signal(0);
   readonly answers = signal<Answer[]>(QUESTIONS.map((q) => ({ questionId: q.id, text: '' })));
@@ -51,12 +52,13 @@ export class InterviewService {
     document.addEventListener('visibilitychange', () => this.tick());
   }
   showSetup() { this.stage.set('setup'); }
+  enableSyntheticDemo() { this.demoMode.set(true); this.stage.set('setup'); }
   start(name: string, group: string) {
     if (this.stage() !== 'sound-check') return;
-    clearResult(); this.resultSaved.set(true);
+    if (!this.demoMode()) clearResult(); this.resultSaved.set(true);
     this.name.set(name.trim()); this.group.set(group.trim());
     this.id = crypto.randomUUID(); this.startedAt.set(Date.now()); this.elapsedSeconds.set(0);
-    this.index.set(0); this.answers.set(QUESTIONS.map((q) => ({ questionId: q.id, text: '' })));
+    this.index.set(0); this.answers.set(QUESTIONS.map((q) => ({ questionId: q.id, text: this.demoMode() ? `DEMO: A fictional answer for question ${q.id}.` : '' })));
     this.legacyDraft.set(false); this.stage.set('interview'); this.save(); this.startTicker(); this.audio.enterQuestion(QUESTIONS[0].id);
   }
   resume() {
@@ -71,6 +73,7 @@ export class InterviewService {
   }
   private save() {
     if (!this.id) return;
+    if (this.demoMode()) { this.savedOnDevice.set(true); return; }
     this.savedOnDevice.set(saveDraft({ version: 2, questionSetVersion: 2, id: this.id, name: this.name(), group: this.group(), answers: this.answers(), index: this.index(), startedAt: this.startedAt(), updatedAt: Date.now() }));
     if (!this.savedOnDevice()) this.message.set('This device could not save your draft. Copy your answers before leaving.');
   }
@@ -102,9 +105,9 @@ export class InterviewService {
     try {
       const deadline = new Promise<never>((_, reject) => { timeoutHandle = setTimeout(() => { controller.abort(); reject(new Error('Feedback is taking longer than expected. Your answers are still here; please try again.')); }, 70_000); });
       const request = async (): Promise<Evaluation> => {
-        const csrf = await this.csrfForSubmission();
+        const csrf = this.demoMode() ? '' : await this.csrfForSubmission();
         if (controller.signal.aborted) throw new Error('Feedback is taking longer than expected. Your answers are still here; please try again.');
-        const response = await fetch('/api/evaluate', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify({ requestId: this.id, studentName: this.name(), tutorGroup: this.group(), answers: this.answers() }), signal: controller.signal });
+        const response = await fetch('/api/evaluate', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(this.demoMode() ? {} : { 'X-CSRF-Token': csrf }) }, body: JSON.stringify(this.demoMode() ? { demo: true } : { requestId: this.id, studentName: this.name(), tutorGroup: this.group(), answers: this.answers() }), signal: controller.signal });
         if (!response.headers.get('content-type')?.toLowerCase().includes('application/json')) throw new Error('The feedback service returned an unexpected page. Your answers are still here; please try again later.');
         let data: { evaluation?: Evaluation; error?: string };
         try { data = await response.json() as { evaluation?: Evaluation; error?: string }; }
@@ -114,7 +117,7 @@ export class InterviewService {
       };
       const evaluation = await Promise.race([request(), deadline]);
       this.evaluation.set(evaluation);
-      this.resultSaved.set(saveResult(this.id, evaluation));
+      this.resultSaved.set(this.demoMode() ? true : saveResult(this.id, evaluation));
       this.stage.set('results');
     } catch (error) {
       this.message.set(error instanceof Error ? error.message : 'Feedback is unavailable right now.');
@@ -133,7 +136,7 @@ export class InterviewService {
     catch { this.copyMessage.set('Copy did not work. Select the answers below to copy them.'); }
   }
   clear() {
-    this.speech.cancelRecognition(); this.audio.reset(); clearInterval(this.tickHandle); clearDraft(); clearResult();
+    this.speech.cancelRecognition(); this.audio.reset(); clearInterval(this.tickHandle); if (!this.demoMode()) { clearDraft(); clearResult(); }
     this.id = ''; this.name.set(''); this.group.set(''); this.answers.set(QUESTIONS.map((q) => ({ questionId: q.id, text: '' })));
     this.startedAt.set(0); this.elapsedSeconds.set(0); this.evaluation.set(null); this.message.set(''); this.copyMessage.set(''); this.resultSaved.set(true); this.legacyDraft.set(false); this.stage.set('welcome');
   }

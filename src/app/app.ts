@@ -138,9 +138,12 @@ export class App {
     try {
       const response = await fetch('/api/guest/availability', { cache: 'no-store', signal: AbortSignal.timeout(8_000) });
       if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error('The classroom status could not be checked. Please try again.');
-      const data = await response.json() as { open?: boolean };
+      const data = await response.json() as { open?: boolean; demo?: boolean };
       if (data.open !== true) { this.availabilityMessage.set('This classroom run is not open yet. Please ask your teacher before starting.'); return; }
-      this.interview.showSetup();
+      if (data.demo === true) {
+        this.interview.enableSyntheticDemo();
+        this.form.setValue({ firstName: 'Demo', lastName: 'Student', group: '7A' });
+      } else this.interview.showSetup();
       if (this.interview.stage() === 'setup') this.schedulePrivacyNotice();
     } catch { this.availabilityMessage.set('The classroom status could not be checked. Please connect and try again.'); }
     finally { this.checkingAvailability.set(false); }
@@ -159,11 +162,12 @@ export class App {
     const preparedStream = this.stopSoundCheck(true);
     this.interview.start(`${this.form.controls.firstName.value.trim()} ${this.form.controls.lastName.value.trim()}`, this.form.controls.group.value === 'Other' ? this.otherGroup.value : this.form.controls.group.value);
     this.syncAnswer();
-    if (this.interview.stage() === 'interview') { this.nova.inputDeviceId = this.microphone.value; this.nova.prepareInterview(preparedStream); }
+    if (this.interview.stage() === 'interview' && !this.interview.demoMode()) { this.nova.inputDeviceId = this.microphone.value; this.nova.prepareInterview(preparedStream); }
     else preparedStream?.getTracks().forEach((track) => track.stop());
   }
   async startSoundCheck() {
     this.stopSoundCheck();
+    if (this.interview.demoMode()) { this.soundCheckStatus.set('DEMO: Microphone capture is disabled. You can hear the question audio and type answers.'); return; }
     const generation = this.soundCheckGeneration;
     if (!navigator.mediaDevices?.getUserMedia || !window.AudioContext) { this.soundCheckStatus.set('Microphone access is unavailable here. You can type every answer.'); return; }
     try {
@@ -207,7 +211,7 @@ export class App {
     this.soundCheckActive.set(false); this.soundCheckLevel.set(0);
     return stream;
   }
-  resume() { this.interview.resume(); this.syncAnswer(); if (this.interview.stage() === 'interview') this.nova.prepareInterview(); }
+  resume() { this.interview.resume(); this.syncAnswer(); if (this.interview.stage() === 'interview' && !this.interview.demoMode()) this.nova.prepareInterview(); }
   private clearNovaDisplay() { if (this.useNova3) { this.nova.confirmed.set(''); this.nova.provisional.set(''); } }
   async move(delta: number) { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { if (await this.speech.stopRecognition() === false) return; this.speechGeneration++; this.interview.move(delta); this.syncAnswer(); this.clearNovaDisplay(); } finally { this.navigationBusy.set(false); } }
   async skip() { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { await this.speech.stopRecognition(); if (this.nova.connectionState() === 'ERROR') this.nova.cancelRecognition(); this.speechGeneration++; this.interview.move(1); this.syncAnswer(); this.clearNovaDisplay(); } finally { this.navigationBusy.set(false); } }
@@ -229,9 +233,10 @@ export class App {
   clearDraft() { if (confirm('Clear your saved interview draft and answers from this device?')) this.resetStudentSession(); }
   finishAndClear() { this.resetStudentSession(); }
   async replayQuestion() { if (this.navigationBusy()) return; this.navigationBusy.set(true); try { if (await this.speech.stopRecognition() === false) return; this.speechGeneration++; this.audio.replay(this.interview.currentQuestion().id); } finally { this.navigationBusy.set(false); } }
-  async inspectMicrophones() { if (!this.useNova3) return; try { const devices = await navigator.mediaDevices.enumerateDevices(); this.nova.availableMicrophones.set(devices.filter((item) => item.kind === 'audioinput').map((item) => ({ id: item.deviceId, label: item.label || 'Microphone' }))); } catch { this.soundCheckStatus.set('Input devices could not be checked. Browser default and typing remain available.'); } }
+  async inspectMicrophones() { if (!this.useNova3 || this.interview.demoMode()) return; try { const devices = await navigator.mediaDevices.enumerateDevices(); this.nova.availableMicrophones.set(devices.filter((item) => item.kind === 'audioinput').map((item) => ({ id: item.deviceId, label: item.label || 'Microphone' }))); } catch { this.soundCheckStatus.set('Input devices could not be checked. Browser default and typing remain available.'); } }
   testQuestionAudio() { if (this.useNova3) this.nova.cancelRecognition(); this.audio.test(); }
   async testMicrophone() {
+    if (this.interview.demoMode()) { this.soundCheckStatus.set('DEMO: Microphone capture is disabled. Type your answers to explore the journey.'); return; }
     if (this.useNova3) {
       if (this.soundCheckActive()) { this.stopSoundCheck(); this.soundCheckStatus.set('Microphone test stopped. You can retry or type every answer.'); return; }
       await this.startSoundCheck();
@@ -242,6 +247,7 @@ export class App {
     catch { this.speech.status.set('Microphone permission denied. You can type your answers.'); }
   }
   async toggleMic() {
+    if (this.interview.demoMode()) return;
     if (this.navigationBusy()) return;
     if (this.speech.isListening() || this.nova.isCapturePending()) { this.navigationBusy.set(true); try { await this.speech.stopRecognition(); } finally { this.navigationBusy.set(false); } return; }
     this.audio.stop();

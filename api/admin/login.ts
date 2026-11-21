@@ -1,6 +1,8 @@
+import { previewDemoEnabled } from '../../server/preview-demo';
 import { ApiRequest, ApiResponse, jsonBody, respond, safeError } from '../../server/http';
 import { allowAdminAttempt, issueAdmin, revokeSession, sameOrigin, verifyAdminPassword } from '../../server/session';
 export default async function handler(req: ApiRequest, res: ApiResponse) {
+  if (previewDemoEnabled()) return respond(res, 403, { error: 'This endpoint is unavailable in the synthetic preview.' });
   if (req.method !== 'POST') return respond(res, 405, { error: 'Method not allowed' });
   if (!sameOrigin(req) || req.headers['x-requested-with'] !== 'Year7Interview') return respond(res, 403, { error: 'Request denied.' });
   try {

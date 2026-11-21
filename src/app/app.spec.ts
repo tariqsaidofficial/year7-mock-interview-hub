@@ -33,6 +33,42 @@ describe('student screen', () => {
     expect(Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.experience-card h3')).map((item) => item.textContent?.trim())).toEqual(['Transition & Adjustment', 'Learning & Curiosity', 'Relationships & Leadership', 'Growth & Aspirations']);
   });
 
+  it('runs the protected synthetic journey without microphone, guest session, persistence or real answers in the request', async () => {
+    localStorage.clear(); sessionStorage.clear();
+    const getUserMedia = vi.fn();
+    vi.stubGlobal('navigator', { ...navigator, userAgent: navigator.userAgent, onLine: true, mediaDevices: { getUserMedia, enumerateDevices: vi.fn() } });
+    const requests: { url: string; init?: RequestInit }[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
+      requests.push({ url: input, init });
+      return input.includes('availability')
+        ? { ok: true, headers: { get: () => 'application/json' }, json: async () => ({ open: true, demo: true }) }
+        : { ok: true, headers: { get: () => 'application/json' }, json: async () => ({ evaluation: { rubricVersion: 2, categories: [], whatWentWell: [], evenBetterIf: '', overallSummary: 'DEMO only', formattedCopyableText: 'DEMO only' } }) };
+    }));
+    const fixture = setup(); const app = fixture.componentInstance;
+    await app.openSetup(); fixture.detectChanges();
+    expect(app.interview.demoMode()).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain('DEMO: synthetic data only');
+    expect(app.form.value).toEqual({ firstName: 'Demo', lastName: 'Student', group: '7A' });
+    await app.continueToSoundCheck();
+    expect(getUserMedia).not.toHaveBeenCalled();
+    await app.testMicrophone();
+    expect(getUserMedia).not.toHaveBeenCalled();
+    app.start();
+    expect(app.interview.stage()).toBe('interview');
+    expect(app.nova.prepareInterview).not.toHaveBeenCalled();
+    app.interview.updateAnswer('A temporary edit that must not leave this tab');
+    for (let index = 1; index < 10; index++) app.interview.move(1);
+    expect(app.interview.currentQuestion().id).toBe(10);
+    await app.interview.submit();
+    expect(app.interview.stage()).toBe('results');
+    expect(requests.map((request) => request.url)).toEqual(['/api/guest/availability', '/api/evaluate']);
+    expect(requests[1].init?.body).toBe('{"demo":true}');
+    expect(localStorage.getItem('year7-interview-draft-v1')).toBeNull();
+    expect(sessionStorage.getItem('year7-interview-result-v1')).toBeNull();
+    expect(getUserMedia).not.toHaveBeenCalled();
+    fixture.destroy();
+  });
+
   it('keeps historic teacher questions and category labels beside their original answers', () => {
     const app = setup().componentInstance;
     const oldRecord = { id: 'old', runId: 'test', studentName: 'Synthetic Student', tutorGroup: '7A', completedAt: '2026-11-15', answers: [{ questionId: 2, text: 'My old answer' }], evaluation: { categories: [], whatWentWell: [], evenBetterIf: '', overallSummary: '', formattedCopyableText: '' } };

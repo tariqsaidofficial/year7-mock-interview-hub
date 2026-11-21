@@ -1,3 +1,4 @@
+import { previewDemoEnabled } from '../../server/preview-demo';
 import { AggregateField } from 'firebase-admin/firestore';
 import { db, runId } from '../../server/firebase-admin';
 import { ApiRequest, ApiResponse, respond, safeError } from '../../server/http';
@@ -6,6 +7,7 @@ import { getSession } from '../../server/session';
 // Aggregate queries read distributed per-session documents. Estimates must be
 // checked against provider dashboards; browser audio telemetry can be missed.
 export default async function handler(req: ApiRequest, res: ApiResponse) {
+  if (previewDemoEnabled()) return respond(res, 403, { error: 'This endpoint is unavailable in the synthetic preview.' });
   if (req.method !== 'GET') return respond(res, 405, { error: 'Method not allowed' });
   try {
     if (!await getSession(req, 'admin')) return respond(res, 401, { error: 'Please sign in.' });
