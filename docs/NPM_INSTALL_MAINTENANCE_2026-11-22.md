@@ -10,7 +10,7 @@ Vercel install/build commands now start a plain Node wrapper before npm initiali
 
 ## Reviewed install-time code
 
-Registry tarball versions and SHA-512 integrity remain unchanged in the existing lockfile. Initial installation used --ignore-scripts for inspection. Then npm install-scripts ls was run with the official npm 12.2.3 CLI (older locally installed npm lacked this command). Node 24.18.0 was used for final checks. Tooling is documented/pinned as npm@12.2.3; engines require policy-capable npm 12.2.3–12.x. .npmrc enables strict-allow-scripts and engine-strict so unknown future script approvals fail closed.
+Registry tarball versions and SHA-512 integrity remain unchanged in the existing lockfile. Initial installation used --ignore-scripts for inspection. Then npm install-scripts ls was run with the official npm 12.2.3 CLI (older locally installed npm lacked this command). Node 24.18.0 was used locally. Vercel reports Node 24.22.3/npm 11.19.1; tooling is pinned as npm@11.19.1, with engines allowing the verified 11.19.1+ backport or 12.2.3+ within those majors. Final installation/checks were repeated on npm 11.19.1 after initial npm 12.2.3 checks. .npmrc enables strict-allow-scripts and engine-strict so unknown future script approvals fail closed.
 
 | Package | Reviewed lifecycle behavior | Decision |
 |---|---|---|
@@ -34,13 +34,15 @@ Reviewed script SHA-256:
 
 ## Local results
 
-npm ci PASS (890 installed, no unreviewed-script warning); npm install-scripts ls: no unreviewed packages. Lint, client/server typechecks, 89 client tests, 57 server/API tests, production build PASS. Three new Node install-policy tests PASS. Temporary synthetic native-dependency smoke (lmdb write/read, msgpackr roundtrip, watcher/fsevents APIs) PASS. Production dependency audit: 0 vulnerabilities.
+npm ci PASS (890 installed, no unreviewed-script warning); npm install-scripts ls: no unreviewed packages. Lint, client/server typechecks, 89 client tests, 57 server/API tests, production build PASS. Three new Node install-policy tests PASS. An isolated offline npm ci --dry-run with the esbuild approval removed returned ESTRICTALLOWSCRIPTS (expected rejection), proving npm 11.19.1 enforces the policy without running unapproved code. Temporary synthetic native-dependency smoke (lmdb write/read, msgpackr roundtrip, watcher/fsevents APIs) PASS. Production dependency audit: 0 vulnerabilities.
 
 Remaining warnings: node-domexception 1.0.0, eslint 9.39.5, OpenTelemetry sdk-trace-base/web 2.9.0/2.10.0 deprecations. Full install audit reports 25 moderate vulnerabilities in the development-inclusive tree; production-only audit is zero. No dependency upgrades or audit fix --force attempted. Build initial bundle 500.45 kB exceeds warning budget by 455 bytes; build succeeds. Existing jsdom canvas warnings do not fail tests. Unsupported platforms without prebuilt native binaries may require a separately reviewed source-build approval; no wildcard permissions added.
 
 ## Preview packaging correction
 
 The first maintenance Preview dpl_DdmMccBvxZrxj9S1ci9vfM7PKwUd stopped before installation: `Cannot find module /vercel/path0/scripts/vercel-npm.mjs`. Existing .vercelignore excluded the scripts directory and .npmrc. Narrow exceptions now include only this reviewed wrapper and npm policy; other scripts/QA/env files stay excluded. Production remained READY throughout.
+
+The next Preview dpl_H1e1pKejxmLhE2yNAwiEpQsqTtUh identified an overly strict npm version requirement (12.2.3 minimum) against the platform npm 11.19.1 backport. Corrected to the versions actually verified, preserving strict policy enforcement. Its log confirmed the injected key is exactly npm_config_cache_dir and the compatibility conversion ran without an unknown-config warning.
 
 ## Preview gate
 

@@ -48,7 +48,7 @@
   },
   "engines": {
     "node": "24.x",
-    "npm": ">=12.2.3 <13"
+    "npm": "^11.19.1 || ^12.2.3"
   },
   "overrides": {
     "@grpc/grpc-js": "1.14.7"
@@ -62,5 +62,5 @@
     "protobufjs": false,
     "fsevents": false
   },
-  "packageManager": "npm@12.2.3"
+  "packageManager": "npm@11.19.1"
 }
