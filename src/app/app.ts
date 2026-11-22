@@ -11,7 +11,7 @@ import { SpeechLabComponent } from './experiments/speech-lab.component';
 import { Nova3SpeechService } from './experiments/nova3-speech.service';
 import { VoiceOrbComponent } from './voice-orb/voice-orb.component';
 import { PrivacyNoticeComponent } from './privacy-notice/privacy-notice.component';
-@Component({ selector: 'app-root', changeDetection: ChangeDetectionStrategy.OnPush, imports: [ReactiveFormsModule, UiIconComponent, SpeechLabComponent, VoiceOrbComponent, PrivacyNoticeComponent], templateUrl: './app.html', styleUrls: ['./app.css', './student-v5.css', './privacy-integration.css', './reflection-score.css'] })
+@Component({ selector: 'app-root', changeDetection: ChangeDetectionStrategy.OnPush, imports: [ReactiveFormsModule, UiIconComponent, SpeechLabComponent, VoiceOrbComponent, PrivacyNoticeComponent], templateUrl: './app.html', styleUrls: ['./app.css', './student-v5.css', './privacy-integration.css', './reflection-score.css', './question-workspace.css'] })
 export class App {
   private readonly destroyRef = inject(DestroyRef);
   readonly speechLab = isDevMode() && typeof location !== 'undefined' && new URLSearchParams(location.search).has('speech-lab');
@@ -245,6 +245,19 @@ export class App {
     if (!navigator.mediaDevices?.getUserMedia) { this.speech.status.set('Microphone unavailable. You can type your answers.'); return; }
     try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); stream.getTracks().forEach((track) => track.stop()); this.speech.status.set('Microphone access is allowed. Speech recognition may mishear words; check and edit your answer.'); }
     catch { this.speech.status.set('Microphone permission denied. You can type your answers.'); }
+  }
+  // Presentation only: the existing service remains the source of capture/transport truth.
+  questionSpeechProblem(): boolean {
+    return this.nova.connectionState() === 'ERROR' || /permission.*denied|capture.*(failed|unavailable)|microphone disconnected|audio preparation failed/i.test(this.speech.status());
+  }
+  questionMicStatus(): string {
+    const state = this.nova.connectionState();
+    if (this.interview.demoMode() || !this.interview.online() || !this.speech.recognitionAvailable() || this.questionSpeechProblem()) return 'Microphone unavailable. You can type instead.';
+    if (state === 'FINALISING') return 'Adding your words…';
+    if (this.speech.isListening()) return 'Listening to you…';
+    if (this.nova.isCapturePending()) return 'Starting microphone…';
+    if ((state === 'READY' || state === 'CLOSED') && this.nova.confirmed().trim() && !this.nova.provisional()) return 'Your answer is ready to edit';
+    return 'Tap to speak';
   }
   async toggleMic() {
     if (this.interview.demoMode()) return;

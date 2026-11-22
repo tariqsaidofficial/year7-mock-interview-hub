@@ -9,7 +9,7 @@ import { loadDraft } from './draft';
 
 describe('student screen', () => {
   function setup() {
-    TestBed.configureTestingModule({ imports: [App], providers: [{ provide: SpeechService, useValue: { status: () => 'Browser fallback unused', recognitionAvailable: () => false, isListening: () => false, stopRecognition: vi.fn() } }, { provide: Nova3SpeechService, useValue: { status: () => 'Stopped', connectionState: vi.fn(() => 'IDLE'), recognitionAvailable: () => false, isListening: vi.fn(() => false), isCapturePending: () => false, stopRecognition: vi.fn(), cancelRecognition: vi.fn(), prepareInterview: vi.fn(), provisional: signal(''), confirmed: signal(''), audioLevel: signal(0) } }, { provide: QuestionAudioService, useValue: { message: () => 'Audio unavailable', state: () => 'unavailable', enterQuestion: vi.fn(), stop: vi.fn(), reset: vi.fn() } }] });
+    TestBed.configureTestingModule({ imports: [App], providers: [{ provide: SpeechService, useValue: { status: () => 'Browser fallback unused', recognitionAvailable: () => false, isListening: () => false, stopRecognition: vi.fn() } }, { provide: Nova3SpeechService, useValue: { status: signal('Stopped'), connectionState: vi.fn(() => 'IDLE'), recognitionAvailable: vi.fn(() => false), isListening: vi.fn(() => false), isCapturePending: vi.fn(() => false), startRecognition: vi.fn(), stopRecognition: vi.fn(), cancelRecognition: vi.fn(), prepareInterview: vi.fn(), provisional: signal(''), confirmed: signal(''), audioLevel: signal(0) } }, { provide: QuestionAudioService, useValue: { message: signal('Audio unavailable'), state: vi.fn(() => 'unavailable'), replay: vi.fn(), enterQuestion: vi.fn(), stop: vi.fn(), reset: vi.fn() } }] });
     return TestBed.createComponent(App);
   }
   function startSyntheticInterview(app: App) {
@@ -25,6 +25,69 @@ describe('student screen', () => {
     Object.defineProperty(HTMLDialogElement.prototype, 'close', { configurable: true, value: function (this: HTMLDialogElement) { this.open = false; this.dispatchEvent(new Event('close')); } });
   }
   afterEach(() => { vi.unstubAllGlobals(); Reflect.deleteProperty(HTMLDialogElement.prototype, 'showModal'); Reflect.deleteProperty(HTMLDialogElement.prototype, 'close'); vi.useRealTimers(); history.replaceState({}, '', '/'); });
+  it('uses one editable answer, a compact recorder and a short accessible replay control', async () => {
+    const fixture=setup(),app=fixture.componentInstance; startSyntheticInterview(app);
+    vi.mocked(app.nova.recognitionAvailable).mockReturnValue(true);
+    vi.mocked(app.nova.connectionState).mockReturnValue('READY');
+    app.nova.status.set('Speech connection ready. Tap to speak.');
+    vi.mocked(app.audio.state).mockReturnValue('idle'); app.audio.message.set('Question audio finished.');
+    fixture.detectChanges(); const root=fixture.nativeElement as HTMLElement;
+    expect(root.querySelectorAll('#answer')).toHaveLength(1);
+    expect(root.querySelector('.confirmed-panel')).toBeNull();
+    expect(root.querySelector('.compact-microphone-status')?.textContent).toBe('Tap to speak');
+    expect(root.textContent).not.toContain('Speech connection ready. Tap to speak.');
+    expect(root.querySelector('.question-audio-feedback')?.classList.contains('question-feedback-hidden')).toBe(true);
+    const replay=root.querySelector<HTMLButtonElement>('.replay-button')!;
+    expect(replay.textContent).toContain('Listen again'); expect(replay.getAttribute('aria-label')).toBe('Listen to the question again');
+    await app.replayQuestion(); expect(app.audio.replay).toHaveBeenCalledWith(1);
+    vi.mocked(app.audio.state).mockReturnValue('playing'); fixture.detectChanges(); expect(replay.textContent).toContain('Playing…');
+    expect(root.querySelector('label[for="answer"]')?.textContent).toContain('Your answer (edit or type your own words)');
+    app.finishAndClear(); fixture.destroy();
+  });
+
+  it('reports real capture, finalisation, completion and failure states without claiming idle readiness', () => {
+    const fixture=setup(),app=fixture.componentInstance;
+    vi.mocked(app.nova.recognitionAvailable).mockReturnValue(true);
+    expect(app.questionMicStatus()).toBe('Tap to speak');
+    vi.mocked(app.nova.isCapturePending).mockReturnValue(true); expect(app.questionMicStatus()).toBe('Starting microphone…');
+    vi.mocked(app.nova.isCapturePending).mockReturnValue(false); vi.mocked(app.nova.isListening).mockReturnValue(true);
+    vi.mocked(app.nova.connectionState).mockReturnValue('RECORDING_LOCAL'); expect(app.questionMicStatus()).toBe('Listening to you…');
+    vi.mocked(app.nova.connectionState).mockReturnValue('FINALISING'); expect(app.questionMicStatus()).toBe('Adding your words…');
+    vi.mocked(app.nova.isListening).mockReturnValue(false); vi.mocked(app.nova.connectionState).mockReturnValue('CLOSED');
+    expect(app.questionMicStatus()).toBe('Tap to speak'); app.nova.confirmed.set('Confirmed words'); expect(app.questionMicStatus()).toBe('Your answer is ready to edit');
+    vi.mocked(app.nova.connectionState).mockReturnValue('ERROR'); expect(app.questionMicStatus()).toBe('Microphone unavailable. You can type instead.');
+    app.nova.status.set('Microphone permission was denied. You can type every answer.'); vi.mocked(app.nova.connectionState).mockReturnValue('PREPARING');
+    expect(app.questionSpeechProblem()).toBe(true); expect(app.questionMicStatus()).toContain('Microphone unavailable'); fixture.destroy();
+  });
+
+  it('keeps confirmed speech in the editor without duplicates and preserves edits against late callbacks', async () => {
+    const fixture=setup(),app=fixture.componentInstance; startSyntheticInterview(app);
+    vi.mocked(app.nova.recognitionAvailable).mockReturnValue(true);
+    let onText!: (text:string)=>void;
+    vi.mocked(app.nova.startRecognition).mockImplementation(callback=>{onText=(text)=>callback(text,true);return true;});
+    await app.toggleMic(); vi.mocked(app.nova.isListening).mockReturnValue(true);
+    app.nova.provisional.set('not yet confirmed'); app.nova.confirmed.set('spoken words'); onText('ignored interim'); onText('ignored repeat');
+    expect(app.answer.value).toBe('My confirmed answer spoken words');
+    fixture.detectChanges(); expect((fixture.nativeElement as HTMLElement).querySelector<HTMLTextAreaElement>('#answer')?.value).toBe(app.answer.value);
+    expect(app.answer.value).not.toContain('not yet confirmed');
+    app.answer.setValue('My manually edited answer'); app.nova.confirmed.set('late words'); onText('late words');
+    expect(app.answer.value).toBe('My manually edited answer'); expect(loadDraft()?.answers[0].text).toBe('My manually edited answer');
+    vi.mocked(app.nova.isListening).mockReturnValue(false); await app.toggleMic(); app.nova.confirmed.set('a fresh segment'); onText('fresh');
+    expect(app.answer.value).toBe('My manually edited answer a fresh segment'); app.finishAndClear(); fixture.destroy();
+  });
+
+  it('retains the final segment through Next and Back and keeps a usable editor after permission refusal', async () => {
+    const fixture=setup(),app=fixture.componentInstance; startSyntheticInterview(app);
+    vi.mocked(app.nova.recognitionAvailable).mockReturnValue(true);
+    let onText!: (text:string)=>void;vi.mocked(app.nova.startRecognition).mockImplementation(callback=>{onText=(text)=>callback(text,true);return true;});
+    await app.toggleMic();let finish!: (ok:boolean)=>void;vi.mocked(app.nova.stopRecognition).mockReturnValueOnce(new Promise<boolean>(resolve=>{finish=resolve;}));
+    const pending=app.next();expect(app.interview.index()).toBe(0);app.nova.confirmed.set('the final segment');onText('final');finish(true);await pending;
+    await app.move(-1);expect(app.answer.value).toBe('My confirmed answer the final segment');
+    app.nova.status.set('Microphone permission was denied. You can type every answer.');vi.mocked(app.nova.connectionState).mockReturnValue('ERROR');fixture.detectChanges();
+    const editor=(fixture.nativeElement as HTMLElement).querySelector<HTMLTextAreaElement>('#answer')!;expect(editor.disabled).toBe(false);
+    app.answer.setValue('Typing remains available');expect(loadDraft()?.answers[0].text).toBe('Typing remains available');app.finishAndClear();fixture.destroy();
+  });
+
   it('shows the fixed interview welcome screen and setup action', async () => {
     const fixture = setup();
     fixture.detectChanges();

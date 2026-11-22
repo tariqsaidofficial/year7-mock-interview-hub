@@ -1,0 +1,22 @@
+/* Question screen only; all colours, surfaces and typography follow existing V5. */
+.student-experience .interview-v5 .question-card{padding:clamp(20px,2.4vw,30px)}
+.student-experience .interview-v5 .question-card h2{margin:12px 0 14px}
+.student-experience .interview-v5 .replay-button{display:inline-flex;align-items:center;gap:7px;padding:8px 12px}
+.student-experience .interview-v5 .question-audio-feedback{font-size:12px;line-height:1.6;color:#5c6c87;margin:8px 0 0}
+.question-feedback-hidden{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px!important;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+.student-experience .interview-v5 .compact-answer-workspace{margin-top:12px;padding:12px;border-radius:19px;text-align:left}
+.compact-microphone-header{display:flex;align-items:center;gap:22px;padding:4px 8px 10px;min-width:0}
+.compact-microphone-copy{min-width:0;padding-left:18px;border-left:1px solid #dbe5f4;overflow-wrap:anywhere}
+.compact-microphone-copy>strong{display:block;font-size:15px;font-weight:850;line-height:1.4;color:inherit}
+.compact-microphone-status{font-size:14px;line-height:1.5;color:#40506b;margin:4px 0 0}
+.student-experience .interview-v5 .compact-answer-workspace .answer-field{margin-top:4px;padding:12px;border-radius:13px;background:#fff;min-width:0}
+.student-experience .interview-v5 .compact-answer-workspace .answer-field textarea{min-height:100px;resize:vertical;line-height:1.55}
+.student-experience .interview-v5 .compact-answer-workspace .field-label{line-height:1.5}
+.student-experience .interview-v5 .question-speech-error,.student-experience .interview-v5 .question-transport-notice{font-size:13px;line-height:1.6;color:#40506b;margin:4px 4px 12px;overflow-wrap:anywhere}
+.student-experience .interview-v5 .provisional-panel{overflow-wrap:anywhere;white-space:pre-wrap;padding:0 4px}
+@media(max-width:740px){.student-experience .interview-v5 .question-card{padding:18px}.compact-microphone-header{gap:14px;padding:4px 2px 10px}.compact-microphone-copy{padding-left:12px}.student-experience .interview-v5 .compact-answer-workspace{padding:10px}.student-experience .interview-v5 .compact-answer-workspace .answer-field{padding:10px}.student-experience .interview-v5 .field-label span{display:inline}.student-experience .interview-v5 .question-card h2{overflow-wrap:anywhere;letter-spacing:-.035em}}
+@media(forced-colors:active){.compact-microphone-copy{border-color:CanvasText}.student-experience .interview-v5 .compact-answer-workspace{border-color:CanvasText}}
+/* Let the existing question heading/timer reflow only when enlarged text needs it. */
+.student-experience .interview-v5 .interview-heading{flex-wrap:wrap}
+.student-experience .interview-v5 .interview-heading>div{flex:1 1 150px;min-width:0;overflow-wrap:anywhere}
+.student-experience .interview-v5 .time-guide{max-width:100%}

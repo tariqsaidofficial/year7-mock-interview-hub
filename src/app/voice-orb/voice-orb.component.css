@@ -15,3 +15,10 @@
 @media(max-width:740px){ .voice-orb {--orb-button:94px;width:min(220px,100%);} }
 @media(max-width:390px){ .voice-orb {--orb-button:90px;width:min(208px,100%);} }
 @media(prefers-reduced-motion:reduce){ .voice-orb-button {transition:none;} .voice-orb-button:hover {transform:none;} }
+
+/* Compact question view only. Keep the same real amplitude-driven canvas and button. */
+:host(.interview-orb){width:80px;flex:none}
+:host(.interview-orb) .voice-orb{--orb-button:60px;width:80px;height:80px;margin:0;contain:layout style}
+:host(.interview-orb) .voice-orb-canvas{width:140px;height:140px;inset:auto;left:50%;top:50%;transform:translate(-50%,-50%)}
+:host(.interview-orb) .voice-orb-button svg{width:28px;height:28px}
+@media(max-width:740px){:host(.interview-orb){width:74px}:host(.interview-orb) .voice-orb{--orb-button:56px;width:74px;height:74px}:host(.interview-orb) .voice-orb-canvas{width:130px;height:130px}}
