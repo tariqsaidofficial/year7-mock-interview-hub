@@ -38,6 +38,10 @@ npm ci PASS (890 installed, no unreviewed-script warning); npm install-scripts l
 
 Remaining warnings: node-domexception 1.0.0, eslint 9.39.5, OpenTelemetry sdk-trace-base/web 2.9.0/2.10.0 deprecations. Full install audit reports 25 moderate vulnerabilities in the development-inclusive tree; production-only audit is zero. No dependency upgrades or audit fix --force attempted. Build initial bundle 500.45 kB exceeds warning budget by 455 bytes; build succeeds. Existing jsdom canvas warnings do not fail tests. Unsupported platforms without prebuilt native binaries may require a separately reviewed source-build approval; no wildcard permissions added.
 
+## Preview packaging correction
+
+The first maintenance Preview dpl_DdmMccBvxZrxj9S1ci9vfM7PKwUd stopped before installation: `Cannot find module /vercel/path0/scripts/vercel-npm.mjs`. Existing .vercelignore excluded the scripts directory and .npmrc. Narrow exceptions now include only this reviewed wrapper and npm policy; other scripts/QA/env files stay excluded. Production remained READY throughout.
+
 ## Preview gate
 
 Push only this maintenance branch; verify READY, matching SHA and actual install/build logs before recommending any Production update. Preview remains protected and closed to live classroom operations; it does not inherit the branch-specific synthetic flag from the prior feature branch. Production continues serving its existing deployment. Final deployment ID, warning comparison and live availability recheck are in the completion report.

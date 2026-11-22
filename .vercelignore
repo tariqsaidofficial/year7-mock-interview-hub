@@ -13,3 +13,9 @@
 !tsconfig.app.json
 !tsconfig.json
 !vercel.json
+
+# Only the reviewed npm build wrapper and lifecycle policy belong in the build.
+!.npmrc
+!scripts
+/scripts/*
+!/scripts/vercel-npm.mjs
