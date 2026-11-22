@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm run build",
+  "installCommand": "node scripts/vercel-npm.mjs ci",
+  "buildCommand": "node scripts/vercel-npm.mjs run build",
   "outputDirectory": "dist/app/browser",
   "functions": { "api/evaluate.ts": { "maxDuration": 60 } },
   "rewrites": [ { "source": "/admin", "destination": "/index.html" } ],
