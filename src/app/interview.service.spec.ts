@@ -4,7 +4,8 @@ import { InterviewService, STUDENT_CSRF } from './interview.service';
 import { Nova3SpeechService } from './experiments/nova3-speech.service';
 import { QuestionAudioService } from './question-audio.service';
 import { saveDraft } from './draft';
-import { QUESTIONS } from './interview.models';
+import { DEMO_REFLECTION_ANSWERS, scoreReflectionAnswers } from './reflection-score';
+import { CATEGORIES, QUESTIONS } from './interview.models';
 import { loadResult, saveResult } from './result-store';
 
 describe('supportive interview timing', () => {
@@ -33,6 +34,54 @@ describe('supportive interview timing', () => {
     TestBed.configureTestingModule({ providers: [InterviewService, { provide: Nova3SpeechService, useValue: speech }, { provide: QuestionAudioService, useValue: audio }, { provide: STUDENT_CSRF, useValue: vi.fn().mockResolvedValue('test-csrf') }] });
     return { interview: TestBed.inject(InterviewService), speech, audio };
   }
+
+  it('scores only fixed demo fixtures even if the visitor edits an answer', () => {
+    const { interview } = service();
+    interview.enableSyntheticDemo(); interview.stage.set('sound-check'); interview.start('Demo Student', '7A');
+    interview.updateAnswer('A visitor edit must never be scored');
+    interview.evaluation.set({ rubricVersion: 2, categories: [], whatWentWell: [], evenBetterIf: '', overallSummary: '', formattedCopyableText: '' });
+    expect(interview.reflectionScore()).toEqual(scoreReflectionAnswers(DEMO_REFLECTION_ANSWERS));
+    expect(localStorage.length).toBe(0); expect(sessionStorage.length).toBe(0);
+    interview.clear();
+  });
+
+  it('does not infer scores from qualitative results or old rubric records', () => {
+    const { interview } = service();
+    for (const rubricVersion of [1, 2] as const) {
+      interview.evaluation.set({ rubricVersion, categories: [], whatWentWell: [], evenBetterIf: '', overallSummary: '', formattedCopyableText: '' });
+      expect(interview.reflectionScore()).toBe('unavailable');
+    }
+    interview.clear();
+  });
+
+  it('recovers a grounded V2 answer score but rejects incomplete restored answer provenance', () => {
+    const id = 'restored-score';
+    const draft = { version: 2 as const, questionSetVersion: 2 as const, id, name: 'Synthetic Adult', group: '7A', answers: [...DEMO_REFLECTION_ANSWERS], index: 9, startedAt: Date.now(), updatedAt: Date.now() };
+    const evaluation = { rubricVersion: 2 as const, categories: CATEGORIES.map(c => ({categoryId:c.id,indicator:'Some evidence' as const,evidence:'Synthetic',nextStep:'Try detail'})),whatWentWell:[],evenBetterIf:'Try detail',overallSummary:'Synthetic',formattedCopyableText:'Synthetic'};
+    saveDraft(draft); saveResult(id,evaluation);
+    let current = service().interview;
+    expect(current.reflectionScore()).toEqual(scoreReflectionAnswers(DEMO_REFLECTION_ANSWERS));
+    current.clear(); TestBed.resetTestingModule();
+    saveDraft({...draft,answers:draft.answers.slice(1)}); saveResult(id,evaluation);
+    current=service().interview;
+    expect(current.reflectionScore()).toBe('unavailable'); current.clear();
+  });
+
+  it('derives the live score from the actual submitted answers, never the demo fixture or AI feedback', async () => {
+    const evaluation = { rubricVersion: 2 as const, categories: [],whatWentWell:[],evenBetterIf:'',overallSummary:'',formattedCopyableText:'Synthetic test only'};
+    const fetcher=vi.fn().mockResolvedValue(new Response(JSON.stringify({evaluation}),{headers:{'Content-Type':'application/json'}}));
+    vi.stubGlobal('fetch',fetcher);
+    const { interview }=service(); interview.stage.set('sound-check'); interview.start('Synthetic Adult','7A');
+    interview.updateAnswer('Science');
+    const submitted=interview.answers().map(a=>({...a}));
+    await interview.submit();
+    expect(JSON.parse(fetcher.mock.calls[0][1].body).answers).toEqual(submitted);
+    expect(interview.demoMode()).toBe(false);
+    expect(interview.reflectionScore()).toEqual(scoreReflectionAnswers(submitted));
+    expect(interview.reflectionScore()).toMatchObject({total:1});
+    expect(interview.reflectionScore()).not.toEqual(scoreReflectionAnswers(DEMO_REFLECTION_ANSWERS));
+    interview.clear();
+  });
 
   it('counts down gently and does not submit, lock typing or interrupt audio after eight minutes', () => {
     const { interview, audio, speech } = service();

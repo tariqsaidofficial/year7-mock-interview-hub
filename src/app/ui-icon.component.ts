@@ -40,7 +40,7 @@ export type IconName = keyof typeof ICONS;
   standalone: true,
   imports: [LucideDynamicIcon],
   template: '<svg [lucideIcon]="icons[name]" class="ui-icon" aria-hidden="true" />',
-  styles: [':host{display:inline-flex;vertical-align:middle}.ui-icon{width:1.25rem;height:1.25rem;flex:none;stroke-width:1.9}'],
+  styles: [':host{display:inline-flex;vertical-align:middle}.ui-icon{width:var(--ui-icon-size,1.25rem);height:var(--ui-icon-size,1.25rem);flex:none;stroke-width:1.9}'],
 })
 export class UiIconComponent {
   @Input({ required: true }) name!: IconName;

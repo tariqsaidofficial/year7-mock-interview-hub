@@ -4,6 +4,7 @@ import { clearDraft, Draft, loadDraft, saveDraft } from './draft';
 import { clearResult, loadResult, saveResult } from './result-store';
 import { guestCsrf } from './session';
 import { Nova3SpeechService } from './experiments/nova3-speech.service';
+import { DEMO_REFLECTION_ANSWERS, scoreReflectionAnswers } from './reflection-score';
 import { QuestionAudioService } from './question-audio.service';
 export type Stage = 'welcome' | 'setup' | 'sound-check' | 'resume-draft' | 'legacy-draft' | 'interview' | 'evaluating' | 'offline-pending' | 'evaluation-error' | 'results';
 const RECOMMENDED_SECONDS = 8 * 60;
@@ -13,6 +14,8 @@ export class InterviewService {
   readonly questions = QUESTIONS;
   readonly stage = signal<Stage>('welcome');
   readonly demoMode = signal(false);
+  private readonly scoredAnswers = signal<readonly Answer[] | null>(null);
+  readonly reflectionScore = computed(() => this.evaluation()?.rubricVersion === 2 ? scoreReflectionAnswers(this.demoMode() ? DEMO_REFLECTION_ANSWERS : this.scoredAnswers()) : 'unavailable');
   readonly name = signal(''); readonly group = signal('');
   readonly index = signal(0);
   readonly answers = signal<Answer[]>(QUESTIONS.map((q) => ({ questionId: q.id, text: '' })));
@@ -44,7 +47,7 @@ export class InterviewService {
       this.restore(draft);
       this.legacyDraft.set(draft.questionSetVersion !== 2);
       const recovered = loadResult(draft.id);
-      if (recovered) { this.evaluation.set(recovered); this.stage.set('results'); }
+      if (recovered) { this.scoredAnswers.set(draft.questionSetVersion === 2 ? draft.answers : null); this.evaluation.set(recovered); this.stage.set('results'); }
       else this.stage.set(this.legacyDraft() ? 'legacy-draft' : 'resume-draft');
     } else clearResult();
     window.addEventListener('online', () => { this.online.set(true); if (this.stage() === 'offline-pending') void this.submit(); });
@@ -58,7 +61,7 @@ export class InterviewService {
     if (!this.demoMode()) clearResult(); this.resultSaved.set(true);
     this.name.set(name.trim()); this.group.set(group.trim());
     this.id = crypto.randomUUID(); this.startedAt.set(Date.now()); this.elapsedSeconds.set(0);
-    this.index.set(0); this.answers.set(QUESTIONS.map((q) => ({ questionId: q.id, text: this.demoMode() ? `DEMO: A fictional answer for question ${q.id}.` : '' })));
+    this.index.set(0); this.answers.set(QUESTIONS.map((q) => ({ questionId: q.id, text: this.demoMode() ? DEMO_REFLECTION_ANSWERS.find(a => a.questionId === q.id)!.text : '' })));
     this.legacyDraft.set(false); this.stage.set('interview'); this.save(); this.startTicker(); this.audio.enterQuestion(QUESTIONS[0].id);
   }
   resume() {
@@ -116,6 +119,7 @@ export class InterviewService {
         return data.evaluation;
       };
       const evaluation = await Promise.race([request(), deadline]);
+      this.scoredAnswers.set(this.answers().map(a => ({ ...a })));
       this.evaluation.set(evaluation);
       this.resultSaved.set(this.demoMode() ? true : saveResult(this.id, evaluation));
       this.stage.set('results');
@@ -137,6 +141,7 @@ export class InterviewService {
   }
   clear() {
     this.speech.cancelRecognition(); this.audio.reset(); clearInterval(this.tickHandle); if (!this.demoMode()) { clearDraft(); clearResult(); }
+    this.scoredAnswers.set(null);
     this.id = ''; this.name.set(''); this.group.set(''); this.answers.set(QUESTIONS.map((q) => ({ questionId: q.id, text: '' })));
     this.startedAt.set(0); this.elapsedSeconds.set(0); this.evaluation.set(null); this.message.set(''); this.copyMessage.set(''); this.resultSaved.set(true); this.legacyDraft.set(false); this.stage.set('welcome');
   }

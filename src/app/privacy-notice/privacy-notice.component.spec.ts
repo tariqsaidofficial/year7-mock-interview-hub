@@ -19,6 +19,8 @@ describe('privacy notice', () => {
     const root = fixture.nativeElement as HTMLElement;
     const dialog = root.querySelector('dialog') as HTMLDialogElement;
     expect(dialog.open).toBe(true);
+    expect(dialog.scrollTop).toBe(0);
+    expect(root.querySelector('#privacy-title')?.getAttribute('tabindex')).toBe('-1');
     expect(dialog.getAttribute('aria-labelledby')).toBe('privacy-title');
     expect(dialog.getAttribute('aria-describedby')).toBe('privacy-description');
     expect(root.querySelectorAll('.privacy-assurance')).toHaveLength(3);

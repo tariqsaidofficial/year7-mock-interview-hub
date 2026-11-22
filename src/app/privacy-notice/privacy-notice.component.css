@@ -283,3 +283,34 @@
   border-bottom: 2px solid currentColor;
   transform: rotate(-45deg) translate(1px, -1px);
 }
+
+/* V3: readable labels, balanced cards and a coherent, static shield/wave. */
+.privacy-content{padding-top:18px}
+.privacy-content h2{margin-bottom:12px}
+.privacy-eyebrow{font-size:11px;line-height:1.5;margin-bottom:12px}
+.privacy-copy{font-size:14px}
+.privacy-assurance strong{font-size:14px}
+.privacy-assurance:hover{transform:none}
+.privacy-more summary{min-height:44px;justify-content:center;font-size:14px;line-height:1.5;padding:8px;box-sizing:border-box}
+.privacy-more summary app-ui-icon{flex:none}
+.privacy-more-body{font-size:14px}
+.privacy-shield-halo{animation:none}
+@media(max-width:480px){
+  .privacy-content{padding:16px 18px 24px}
+  .privacy-content h2{font-size:25px;line-height:1.25}
+  .privacy-eyebrow{font-size:10px;letter-spacing:.08em}
+  .privacy-intro,.privacy-copy{font-size:14px;line-height:1.6}
+  .privacy-assurances{grid-template-columns:minmax(0,1fr);gap:8px;margin:18px 0}
+  .privacy-assurance{flex-direction:row;justify-content:flex-start;min-height:64px;padding:10px 14px;gap:14px;text-align:left}
+  .privacy-assurance-icon{flex:none;width:40px;height:40px}
+  .privacy-assurance strong{font-size:15px;line-height:1.5}
+}
+@media(forced-colors:active){.privacy-dialog{border:2px solid CanvasText}.privacy-shield-icon,.privacy-assurance-icon{color:CanvasText}.privacy-accept{border:1px solid ButtonText}}
+
+/* Size the existing UiIcon SVG through its opt-in token, within encapsulation. */
+.privacy-shield-icon{--ui-icon-size:51px}
+.privacy-assurance-icon{--ui-icon-size:26px}
+.privacy-hero-star{--ui-icon-size:30px}
+.privacy-eyebrow{--ui-icon-size:15px}
+.privacy-more summary{--ui-icon-size:18px}
+@media(max-width:480px){.privacy-shield-icon{--ui-icon-size:37px}.privacy-assurance-icon{--ui-icon-size:22px}}

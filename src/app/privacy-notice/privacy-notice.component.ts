@@ -32,7 +32,10 @@ export class PrivacyNoticeComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     this.returnFocus = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null;
-    this.privacyDialog.nativeElement.showModal();
+    const dialog = this.privacyDialog.nativeElement;
+    dialog.showModal();
+    dialog.querySelector<HTMLElement>('#privacy-title')?.focus({ preventScroll: true });
+    dialog.scrollTop = 0;
   }
 
   dismiss(): void {

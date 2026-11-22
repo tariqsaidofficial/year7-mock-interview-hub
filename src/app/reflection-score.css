@@ -1,0 +1,24 @@
+.student-experience .reflection-intro{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:clamp(12px,3vw,32px)}
+.reflection-intro>div,.reflection-statistics{min-width:0}
+.reflection-statistics{text-align:center;align-self:center;color:#2d4d92;padding:8px 0}
+.reflection-statistics h2{font-size:clamp(15px,1.6vw,20px);font-weight:800;line-height:1.3;margin:0 0 8px;overflow-wrap:anywhere}
+.score-demo{display:block;font-size:12px;line-height:1.5;color:#2d4d92;margin-bottom:9px}
+.score-ring{position:relative;width:min(100%,160px);aspect-ratio:1;margin:0 auto 8px;display:grid;place-items:center}
+.score-ring svg{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke-width:8;transform:rotate(-90deg)}
+.score-track{stroke:#dce8f5}.score-arc{stroke:#087b96;stroke-linecap:round}
+.score-ring>strong{font-size:clamp(23px,3vw,34px);font-variant-numeric:tabular-nums;color:#19356b}.score-ring>strong span{font-size:.5em}
+.score-descriptor{display:block;font-size:12px;line-height:1.5;color:#435978}
+.student-experience .reflection-intro .score-notice{font-size:13px;line-height:1.55;color:#435978;margin:10px auto 0;max-width:36ch}
+.question-scores{margin:5px auto 0;font-size:13px;color:#2d4d92}.question-scores summary{min-height:44px;display:flex;align-items:center;justify-content:center;text-decoration:underline;cursor:pointer;line-height:1.4}
+.question-scores summary:focus-visible{outline:3px solid #087b96;outline-offset:2px;border-radius:6px}
+.question-scores ol{list-style:none;padding:8px;margin:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;background:#fff;border-radius:12px;text-align:left}.question-scores li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:3px}
+.student-experience .reflection-intro .score-unavailable{font-weight:800;margin:20px auto;color:#19356b}
+@media(max-width:740px){.student-experience .reflection-intro{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);padding:20px 14px;gap:14px;align-items:start}.student-experience .reflection-intro h1{font-size:clamp(23px,5.6vw,34px)}.student-experience .reflection-intro p:not(.eyebrow){line-height:1.6}.reflection-statistics{padding:0}.score-ring{max-width:120px}.score-ring>strong{font-size:26px}.reflection-statistics h2{font-size:15px}.student-experience .reflection-intro .score-notice{font-size:13px}.score-descriptor,.score-demo{font-size:12px}.question-scores ol{grid-template-columns:1fr}}
+@media(forced-colors:active){.score-track{stroke:GrayText}.score-arc{stroke:CanvasText}.score-ring>strong,.score-demo,.score-notice{color:CanvasText}}
+/* Reflow long words and enlarged text within the required two-column hero. */
+.student-experience .reflection-intro h1,.student-experience .reflection-intro p,.student-experience .reflection-note,.score-demo,.score-descriptor,.question-scores{overflow-wrap:anywhere}
+.score-ring>strong{max-width:90%;overflow-wrap:anywhere;line-height:1.15}
+.student-experience .demo-notice strong{white-space:normal;overflow-wrap:anywhere}
+@media(max-width:420px){.student-experience .header-inner{flex-wrap:wrap}.student-experience .wordmark{flex:1 1 130px;min-width:0}.student-experience .wordmark>div{min-width:0}.student-experience .wordmark strong{overflow-wrap:anywhere}.student-experience .header-actions{flex:0 1 auto;max-width:100%}.student-experience .header-chip{white-space:normal;overflow-wrap:anywhere}}
+/* Existing domain cards must also reflow when users enlarge result text. */
+.student-experience .report-card{min-width:0;overflow-wrap:anywhere}

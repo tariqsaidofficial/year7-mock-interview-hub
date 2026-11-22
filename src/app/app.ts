@@ -11,7 +11,7 @@ import { SpeechLabComponent } from './experiments/speech-lab.component';
 import { Nova3SpeechService } from './experiments/nova3-speech.service';
 import { VoiceOrbComponent } from './voice-orb/voice-orb.component';
 import { PrivacyNoticeComponent } from './privacy-notice/privacy-notice.component';
-@Component({ selector: 'app-root', changeDetection: ChangeDetectionStrategy.OnPush, imports: [ReactiveFormsModule, UiIconComponent, SpeechLabComponent, VoiceOrbComponent, PrivacyNoticeComponent], templateUrl: './app.html', styleUrls: ['./app.css', './student-v5.css', './privacy-integration.css'] })
+@Component({ selector: 'app-root', changeDetection: ChangeDetectionStrategy.OnPush, imports: [ReactiveFormsModule, UiIconComponent, SpeechLabComponent, VoiceOrbComponent, PrivacyNoticeComponent], templateUrl: './app.html', styleUrls: ['./app.css', './student-v5.css', './privacy-integration.css', './reflection-score.css'] })
 export class App {
   private readonly destroyRef = inject(DestroyRef);
   readonly speechLab = isDevMode() && typeof location !== 'undefined' && new URLSearchParams(location.search).has('speech-lab');
